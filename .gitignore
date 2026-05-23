@@ -1,0 +1,26 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Uploads and outputs (user data)
+uploads/
+outputs/
+frames/
+
+# Test files
+test_*.mp4
+test_*.png
+
+# ONNX model (too large for git, downloaded via setup.sh)
+static/models/*.onnx
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upscale4K</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div class="header-inner">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <rect width="32" height="32" rx="8" fill="url(#logo-grad)"/>
+                    <path d="M8 20L14 10L18 16L22 12L24 20" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs><linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#6c5ce7"/><stop offset="1" stop-color="#a29bfe"/></linearGradient></defs>
+                </svg>
+                <h1>Upscale<span>4K</span></h1>
+            </div>
+            <div class="header-badge" id="gpu-badge">
+                <span class="badge-dot"></span>
+                <span id="gpu-status">Checking WebGPU...</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-tab="image" id="nav-image">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    <span>Image Upscale</span>
+                </button>
+                <button class="nav-item" data-tab="video" id="nav-video">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="23 7 16 12 23 17 23 7"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                    <span>Video Upscale</span>
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <span class="sidebar-version">v1.0</span>
+            </div>
+        </aside>
+
+        <!-- Content Area -->
+        <div class="content-area">
+
+            <!-- ===================== IMAGE UPSCALE TAB ===================== -->
+            <main class="tab-content active" id="tab-image">
+                <!-- Image Upload Section -->
+                <section id="img-upload-section">
+                    <div id="img-dropzone" class="dropzone">
+                        <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/webp,image/bmp,image/tiff,.png,.jpg,.jpeg,.webp,.bmp,.tiff,.tif" hidden>
+                        <div class="dropzone-content">
+                            <div class="dropzone-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                                    <polyline points="21 15 16 10 5 21"/>
+                                </svg>
+                            </div>
+                            <h3>Drop your image here</h3>
+                            <p>or click to browse</p>
+                            <span class="dropzone-hint">PNG, JPG, WebP, BMP, TIFF &bull; Max 50MB</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Image App Section (hidden until upload) -->
+                <section id="img-app-section" class="hidden">
+                    <!-- Before / After Comparison -->
+                    <div class="image-compare-container">
+                        <div class="image-panel">
+                            <div class="panel-header">
+                                <span class="panel-label">Original</span>
+                                <span class="panel-badge" id="img-original-res"></span>
+                            </div>
+                            <div class="image-wrapper">
+                                <img id="img-original" alt="Original image">
+                            </div>
+                        </div>
+                        <div class="image-panel" id="img-output-panel">
+                            <div class="panel-header">
+                                <span class="panel-label">Upscaled</span>
+                                <span class="panel-badge" id="img-upscaled-res"></span>
+                            </div>
+                            <div class="image-wrapper">
+                                <img id="img-upscaled" alt="Upscaled image" class="hidden">
+                                <div id="img-output-placeholder" class="output-placeholder">
+                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                                        <polyline points="21 15 16 10 5 21"/>
+                                    </svg>
+                                    <p>Upscaled image will appear here</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Image Info Bar -->
+                    <div class="info-bar" id="img-info-bar">
+                        <div class="info-item">
+                            <span class="info-label">Resolution</span>
+                            <span class="info-value" id="img-info-resolution">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Format</span>
+                            <span class="info-value" id="img-info-format">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Size</span>
+                            <span class="info-value" id="img-info-size">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Image Mode Selection -->
+                    <div class="mode-selector mode-selector-3">
+                        <div class="mode-card selected" data-imgmode="quick" id="img-mode-quick">
+                            <div class="mode-icon basic-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                                </svg>
+                            </div>
+                            <div class="mode-info">
+                                <h3>Quick Upscale</h3>
+                                <p>Real-ESRGAN AI &bull; In your browser</p>
+                                <div class="mode-tags">
+                                    <span class="tag tag-fast">Instant</span>
+                                    <span class="tag tag-gpu">Your GPU</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mode-card" data-imgmode="quality" id="img-mode-quality">
+                            <div class="mode-icon pro-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                                </svg>
+                            </div>
+                            <div class="mode-info">
+                                <h3>Quality Upscale</h3>
+                                <p>FFmpeg Lanczos + CAS &bull; Server-side</p>
+                                <div class="mode-tags">
+                                    <span class="tag tag-ai">High Quality</span>
+                                    <span class="tag tag-server">Server-side</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mode-card" data-imgmode="enhance" id="img-mode-enhance">
+                            <div class="mode-icon enhance-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                                </svg>
+                            </div>
+                            <div class="mode-info">
+                                <h3>Enhance</h3>
+                                <p>AI cleanup &bull; Same size, crystal clear</p>
+                                <div class="mode-tags">
+                                    <span class="tag tag-enhance">Restore</span>
+                                    <span class="tag tag-gpu">Your GPU</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Image Options Row -->
+                    <div class="options-row">
+                        <div class="option-group">
+                            <label>Scale Factor</label>
+                            <div class="scale-buttons" id="img-scale-buttons">
+                                <button class="scale-btn" data-imgscale="2">2x</button>
+                                <button class="scale-btn selected" data-imgscale="4">4x</button>
+                            </div>
+                        </div>
+                        <div class="option-group">
+                            <label>Output Resolution</label>
+                            <span class="output-res" id="img-output-resolution">-</span>
+                        </div>
+                        <button class="upscale-btn" id="img-upscale-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                                <polyline points="17 6 23 6 23 12"/>
+                            </svg>
+                            Start Upscaling
+                        </button>
+                    </div>
+
+                    <!-- Image Progress Section -->
+                    <div id="img-progress-section" class="progress-section hidden">
+                        <div class="progress-header">
+                            <span id="img-progress-message">Processing...</span>
+                            <span id="img-progress-percent">0%</span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill" id="img-progress-fill"></div>
+                        </div>
+                        <div class="progress-footer">
+                            <span id="img-progress-detail"></span>
+                            <span id="img-progress-eta"></span>
+                        </div>
+                    </div>
+
+                    <!-- Image Download Section -->
+                    <div id="img-download-section" class="download-section hidden">
+                        <div class="download-card">
+                            <div class="download-info">
+                                <h3>Upscaling Complete!</h3>
+                                <p id="img-download-details"></p>
+                            </div>
+                            <button class="download-btn" id="img-download-btn">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Download Image
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- New Image Button -->
+                    <div class="new-video-row hidden" id="img-new-row">
+                        <button class="new-video-btn" id="img-new-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            Upload New Image
+                        </button>
+                    </div>
+                </section>
+            </main>
+
+            <!-- ===================== VIDEO UPSCALE TAB ===================== -->
+            <main class="tab-content" id="tab-video">
+                <!-- Upload Section -->
+                <section id="upload-section">
+                    <div id="dropzone" class="dropzone">
+                        <input type="file" id="file-input" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/avi,.mp4,.mov,.webm,.mkv,.avi" hidden>
+                        <div class="dropzone-content">
+                            <div class="dropzone-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                            </div>
+                            <h3>Drop your video here</h3>
+                            <p>or click to browse</p>
+                            <span class="dropzone-hint">MP4, MOV, WebM, MKV &bull; Max 500MB</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Main App Section (hidden until upload) -->
+                <section id="app-section" class="hidden">
+                    <!-- Video Preview -->
+                    <div class="video-container">
+                        <div class="video-panel">
+                            <div class="panel-header">
+                                <span class="panel-label">Original</span>
+                                <span class="panel-badge" id="original-res"></span>
+                            </div>
+                            <video id="original-video" controls playsinline></video>
+                        </div>
+                        <div class="video-panel" id="output-panel">
+                            <div class="panel-header">
+                                <span class="panel-label">Upscaled</span>
+                                <span class="panel-badge" id="upscaled-res"></span>
+                            </div>
+                            <video id="upscaled-video" controls playsinline class="hidden"></video>
+                            <div id="output-placeholder" class="output-placeholder">
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                                    <line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/>
+                                    <line x1="2" y1="12" x2="22" y2="12"/>
+                                    <line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/>
+                                    <line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/>
+                                </svg>
+                                <p>Upscaled preview will appear here</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Video Info Bar -->
+                    <div class="info-bar" id="info-bar">
+                        <div class="info-item">
+                            <span class="info-label">Resolution</span>
+                            <span class="info-value" id="info-resolution">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">FPS</span>
+                            <span class="info-value" id="info-fps">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Duration</span>
+                            <span class="info-value" id="info-duration">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Size</span>
+                            <span class="info-value" id="info-size">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Codec</span>
+                            <span class="info-value" id="info-codec">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Mode Selection -->
+                    <div class="mode-selector">
+                        <div class="mode-card selected" data-mode="basic" id="mode-basic">
+                            <div class="mode-icon basic-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                                </svg>
+                            </div>
+                            <div class="mode-info">
+                                <h3>Basic Upscale</h3>
+                                <p>FFmpeg Lanczos + CAS Sharpening</p>
+                                <div class="mode-tags">
+                                    <span class="tag tag-fast">Fast</span>
+                                    <span class="tag tag-server">Server-side</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mode-card" data-mode="pro" id="mode-pro">
+                            <div class="mode-icon pro-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                                </svg>
+                            </div>
+                            <div class="mode-info">
+                                <h3>Pro Upscale</h3>
+                                <p>Real-ESRGAN AI &bull; WebGPU</p>
+                                <div class="mode-tags">
+                                    <span class="tag tag-ai">AI Enhanced</span>
+                                    <span class="tag tag-gpu">Your GPU</span>
+                                </div>
+                            </div>
+                            <div class="pro-warning hidden" id="pro-warning"></div>
+                        </div>
+                    </div>
+
+                    <!-- Options Row -->
+                    <div class="options-row">
+                        <div class="option-group">
+                            <label>Scale Factor</label>
+                            <div class="scale-buttons" id="scale-buttons">
+                                <button class="scale-btn" data-scale="2">2x</button>
+                                <button class="scale-btn selected" data-scale="4">4x</button>
+                            </div>
+                        </div>
+                        <div class="option-group">
+                            <label>Output Resolution</label>
+                            <span class="output-res" id="output-resolution">3840 x 2160</span>
+                        </div>
+                        <button class="upscale-btn" id="upscale-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                                <polyline points="17 6 23 6 23 12"/>
+                            </svg>
+                            Start Upscaling
+                        </button>
+                    </div>
+
+                    <!-- Progress Section -->
+                    <div id="progress-section" class="progress-section hidden">
+                        <div class="progress-header">
+                            <span id="progress-message">Processing...</span>
+                            <span id="progress-percent">0%</span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div class="progress-footer">
+                            <span id="progress-frames">Frame 0/0</span>
+                            <span id="progress-eta"></span>
+                        </div>
+                    </div>
+
+                    <!-- Download Section -->
+                    <div id="download-section" class="download-section hidden">
+                        <div class="download-card">
+                            <div class="download-info">
+                                <h3>Upscaling Complete!</h3>
+                                <p id="download-details"></p>
+                            </div>
+                            <button class="download-btn" id="download-btn">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Download 4K Video
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- New Video Button -->
+                    <div class="new-video-row hidden" id="new-video-row">
+                        <button class="new-video-btn" id="new-video-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            Upload New Video
+                        </button>
+                    </div>
+                </section>
+            </main>
+
+        </div><!-- /content-area -->
+    </div><!-- /app-layout -->
+
+    <footer>
+        <p>Upscale4K &mdash; Open source AI image & video upscaling. Quick uses Real-ESRGAN via WebGPU. Basic uses FFmpeg server-side. Pro uses AI in your browser.</p>
+    </footer>
+
+    <!-- Hidden canvas for Pro mode frame extraction -->
+    <canvas id="frame-canvas" style="display:none"></canvas>
+    <canvas id="output-canvas" style="display:none"></canvas>
+    <!-- Hidden canvas for image upscaling -->
+    <canvas id="img-input-canvas" style="display:none"></canvas>
+    <canvas id="img-output-canvas" style="display:none"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.all.min.js"></script>
+    <script src="/static/js/pro-upscaler.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/image-app.js"></script>
+</body>
+</html>
