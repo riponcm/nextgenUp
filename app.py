@@ -13,8 +13,19 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, render_template, request, send_file
 
-FFMPEG = shutil.which('ffmpeg') or 'ffmpeg'
-FFPROBE = shutil.which('ffprobe') or 'ffprobe'
+def _find_bin(name):
+    """Find a binary in PATH or common locations."""
+    found = shutil.which(name)
+    if found:
+        return found
+    for d in ['/usr/local/bin', '/opt/homebrew/bin', '/opt/anaconda3/bin', '/usr/bin']:
+        p = os.path.join(d, name)
+        if os.path.isfile(p):
+            return p
+    return name
+
+FFMPEG = _find_bin('ffmpeg')
+FFPROBE = _find_bin('ffprobe')
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
