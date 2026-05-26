@@ -180,7 +180,12 @@
         if (!state.videoInfo) return;
         let w = state.videoInfo.width * state.selectedScale;
         let h = state.videoInfo.height * state.selectedScale;
-        if (w > 3840) { const r = 3840 / w; w = 3840; h = Math.round(h * r); }
+        // Cap the longer dimension at 3840 (4K)
+        const maxDim = 3840;
+        if (w > maxDim || h > maxDim) {
+            if (w >= h) { const r = maxDim / w; w = maxDim; h = Math.round(h * r); }
+            else { const r = maxDim / h; h = maxDim; w = Math.round(w * r); }
+        }
         h = h - (h % 2);
         w = w - (w % 2);
         $('#output-resolution').textContent = `${w} x ${h}`;

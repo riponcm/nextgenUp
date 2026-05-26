@@ -443,10 +443,17 @@ def _run_basic_upscale(task_id, scale):
 
     target_w = info['width'] * scale
     target_h = info['height'] * scale
-    if target_w > 3840:
-        ratio = 3840 / target_w
-        target_w = 3840
-        target_h = int(info['height'] * scale * ratio)
+    # Cap the longer dimension at 3840 (4K) to stay within encoder limits
+    max_dim = 3840
+    if target_w > max_dim or target_h > max_dim:
+        if target_w >= target_h:
+            ratio = max_dim / target_w
+            target_w = max_dim
+            target_h = int(target_h * ratio)
+        else:
+            ratio = max_dim / target_h
+            target_h = max_dim
+            target_w = int(target_w * ratio)
     target_h = target_h - (target_h % 2)
     target_w = target_w - (target_w % 2)
 
