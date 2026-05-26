@@ -426,9 +426,11 @@ def _run_image_upscale(task_id, scale):
             task['output_width'] = target_w
             task['output_height'] = target_h
         else:
-            print(f"[image-upscale] FFmpeg error: {result.stderr[:500]}", flush=True)
+            print(f"[image-upscale] FFmpeg error: {result.stderr[-500:]}", flush=True)
             task['status'] = 'error'
-            task['message'] = f'FFmpeg error: {result.stderr[:200]}'
+            err_lines = [l for l in result.stderr.strip().splitlines() if l.strip() and not l.startswith(' ')]
+            err_msg = err_lines[-1] if err_lines else result.stderr[-200:]
+            task['message'] = f'FFmpeg error: {err_msg[:200]}'
     except Exception as e:
         task['status'] = 'error'
         task['message'] = str(e)
@@ -503,7 +505,10 @@ def _run_basic_upscale(task_id, scale):
             stderr = process.stderr.read() if process.stderr else 'Unknown error'
             print(f"[upscale] FFmpeg error (rc={process.returncode}): {stderr[-500:]}", flush=True)
             task['status'] = 'error'
-            task['message'] = f'FFmpeg error: {stderr[:200]}'
+            # Extract meaningful error from end of stderr (skip version banner)
+            err_lines = [l for l in stderr.strip().splitlines() if l.strip() and not l.startswith(' ')]
+            err_msg = err_lines[-1] if err_lines else stderr[-200:]
+            task['message'] = f'FFmpeg error: {err_msg[:200]}'
     except Exception as e:
         task['status'] = 'error'
         task['message'] = str(e)
@@ -545,7 +550,9 @@ def _run_pro_assemble(task_id, fps):
                 task['output_info'] = out_info
         else:
             task['status'] = 'error'
-            task['message'] = f'Assembly error: {result.stderr[:200]}'
+            err_lines = [l for l in result.stderr.strip().splitlines() if l.strip() and not l.startswith(' ')]
+            err_msg = err_lines[-1] if err_lines else result.stderr[-200:]
+            task['message'] = f'Assembly error: {err_msg[:200]}'
     except Exception as e:
         task['status'] = 'error'
         task['message'] = str(e)
