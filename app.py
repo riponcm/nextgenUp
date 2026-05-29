@@ -31,7 +31,7 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['OUTPUT_FOLDER'] = 'outputs'
 app.config['FRAMES_FOLDER'] = 'frames'
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB
 
 tasks = {}
 

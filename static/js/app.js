@@ -125,8 +125,8 @@
             showToast('Please select a video file.');
             return;
         }
-        if (file.size > 500 * 1024 * 1024) {
-            showToast('File too large. Maximum 500MB.');
+        if (file.size > 2 * 1024 * 1024 * 1024) {
+            showToast('File too large. Maximum 2GB.');
             return;
         }
 
