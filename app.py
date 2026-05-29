@@ -486,6 +486,16 @@ def _run_basic_upscale(task_id, scale):
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True
         )
 
+        # Drain stderr in a background thread to prevent pipe deadlock.
+        # Without this, stderr buffer (64KB) fills up on large videos,
+        # FFmpeg blocks writing to it, and we block reading stdout → hang.
+        stderr_chunks = []
+        def _drain_stderr():
+            for line in process.stderr:
+                stderr_chunks.append(line)
+        stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
+        stderr_thread.start()
+
         for line in process.stdout:
             line = line.strip()
             if line.startswith('frame='):
@@ -498,6 +508,8 @@ def _run_basic_upscale(task_id, scale):
                     pass
 
         process.wait()
+        stderr_thread.join(timeout=5)
+        stderr_output = ''.join(stderr_chunks)
 
         if process.returncode == 0 and os.path.exists(output_path):
             task['status'] = 'completed'
@@ -509,12 +521,10 @@ def _run_basic_upscale(task_id, scale):
             if out_info:
                 task['output_info'] = out_info
         else:
-            stderr = process.stderr.read() if process.stderr else 'Unknown error'
-            print(f"[upscale] FFmpeg error (rc={process.returncode}): {stderr[-500:]}", flush=True)
+            print(f"[upscale] FFmpeg error (rc={process.returncode}): {stderr_output[-500:]}", flush=True)
             task['status'] = 'error'
-            # Extract meaningful error from end of stderr (skip version banner)
-            err_lines = [l for l in stderr.strip().splitlines() if l.strip() and not l.startswith(' ')]
-            err_msg = err_lines[-1] if err_lines else stderr[-200:]
+            err_lines = [l for l in stderr_output.strip().splitlines() if l.strip() and not l.startswith(' ')]
+            err_msg = err_lines[-1] if err_lines else stderr_output[-200:]
             task['message'] = f'FFmpeg error: {err_msg[:200]}'
     except Exception as e:
         task['status'] = 'error'
