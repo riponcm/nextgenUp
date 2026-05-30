@@ -118,16 +118,21 @@ def progress(task_id):
 @app.route('/api/download/<task_id>')
 def download(task_id):
     task = tasks.get(task_id)
-    if not task or task.get('status') != 'completed':
-        return jsonify({'error': 'Not ready'}), 404
 
-    output_path = task.get('output')
-    if not output_path or not os.path.exists(output_path):
-        return jsonify({'error': 'Output file missing'}), 404
+    if task and task.get('status') == 'completed':
+        output_path = task.get('output')
+        if output_path and os.path.exists(output_path):
+            stem = Path(task['filename']).stem
+            download_name = f"{stem}_4K.mp4"
+            return send_file(output_path, as_attachment=True, download_name=download_name)
 
-    stem = Path(task['filename']).stem
-    download_name = f"{stem}_4K.mp4"
-    return send_file(output_path, as_attachment=True, download_name=download_name)
+    # Fallback: task lost after server restart — find the file on disk
+    for suffix in ('_basic_4k.mp4', '_pro_4k.mp4'):
+        path = os.path.join(app.config['OUTPUT_FOLDER'], task_id + suffix)
+        if os.path.exists(path):
+            return send_file(path, as_attachment=True, download_name=f"{task_id}_4K.mp4")
+
+    return jsonify({'error': 'Not ready'}), 404
 
 
 # --- Pro mode: receive upscaled frames from browser WebGPU ---
@@ -271,16 +276,20 @@ def image_status(task_id):
 @app.route('/api/image/download/<task_id>')
 def image_download(task_id):
     task = tasks.get(task_id)
-    if not task or task.get('status') != 'completed':
-        return jsonify({'error': 'Not ready'}), 404
 
-    output_path = task.get('output')
-    if not output_path or not os.path.exists(output_path):
-        return jsonify({'error': 'Output file missing'}), 404
+    if task and task.get('status') == 'completed':
+        output_path = task.get('output')
+        if output_path and os.path.exists(output_path):
+            stem = Path(task['filename']).stem
+            download_name = f"{stem}_upscaled.png"
+            return send_file(output_path, as_attachment=True, download_name=download_name)
 
-    stem = Path(task['filename']).stem
-    download_name = f"{stem}_upscaled.png"
-    return send_file(output_path, as_attachment=True, download_name=download_name)
+    # Fallback: find file on disk after server restart
+    path = os.path.join(app.config['OUTPUT_FOLDER'], task_id + '_upscaled.png')
+    if os.path.exists(path):
+        return send_file(path, as_attachment=True, download_name=f"{task_id}_upscaled.png")
+
+    return jsonify({'error': 'Not ready'}), 404
 
 
 # --- Helpers ---
