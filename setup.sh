@@ -27,21 +27,15 @@ echo "Installing Python dependencies..."
 pip install -q -r requirements.txt
 
 # Create directories
-mkdir -p uploads outputs static/models
+mkdir -p uploads outputs frames static/models
 
-# Convert ONNX model (optional — requires torch)
-if [ ! -f "static/models/realesr-general-x4v3.onnx" ]; then
-    echo ""
-    echo "=== ONNX Model Setup (for Pro WebGPU mode) ==="
-    read -p "Download and convert Real-ESRGAN model to ONNX? Requires torch (~2GB download). [y/N] " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        pip install -q torch
-        python convert_model.py
-    else
-        echo "Skipping model conversion. Pro mode will be unavailable."
-        echo "Run 'python convert_model.py' later to enable it."
-    fi
+# Download pre-converted ONNX model (~5MB, needed for AI modes)
+MODEL="static/models/realesr-general-x4v3.onnx"
+if [ ! -f "$MODEL" ]; then
+    echo "Downloading Real-ESRGAN ONNX model (~5MB)..."
+    curl -L -o "$MODEL" \
+        "https://huggingface.co/OwlMaster/AllFilesRope/resolve/main/realesr-general-x4v3.onnx"
+    echo "Model downloaded."
 fi
 
 echo ""

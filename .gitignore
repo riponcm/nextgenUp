@@ -21,6 +21,7 @@ static/models/*.onnx
 .DS_Store
 Thumbs.db
 
-# IDE
+# IDE / local tooling (machine-specific paths)
 .vscode/
 .idea/
+.claude/

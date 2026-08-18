@@ -35,6 +35,13 @@ app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB
 
 tasks = {}
 
+TASK_ID_RE = re.compile(r'^[a-z0-9_]{1,40}$')
+
+
+def _safe_task_id(task_id):
+    """Validate task_id format to prevent path traversal in disk lookups."""
+    return bool(TASK_ID_RE.fullmatch(task_id))
+
 
 @app.route('/')
 def index():
@@ -127,10 +134,11 @@ def download(task_id):
             return send_file(output_path, as_attachment=True, download_name=download_name)
 
     # Fallback: task lost after server restart — find the file on disk
-    for suffix in ('_basic_4k.mp4', '_pro_4k.mp4'):
-        path = os.path.join(app.config['OUTPUT_FOLDER'], task_id + suffix)
-        if os.path.exists(path):
-            return send_file(path, as_attachment=True, download_name=f"{task_id}_4K.mp4")
+    if _safe_task_id(task_id):
+        for suffix in ('_basic_4k.mp4', '_pro_4k.mp4'):
+            path = os.path.join(app.config['OUTPUT_FOLDER'], task_id + suffix)
+            if os.path.exists(path):
+                return send_file(path, as_attachment=True, download_name=f"{task_id}_4K.mp4")
 
     return jsonify({'error': 'Not ready'}), 404
 
@@ -285,9 +293,10 @@ def image_download(task_id):
             return send_file(output_path, as_attachment=True, download_name=download_name)
 
     # Fallback: find file on disk after server restart
-    path = os.path.join(app.config['OUTPUT_FOLDER'], task_id + '_upscaled.png')
-    if os.path.exists(path):
-        return send_file(path, as_attachment=True, download_name=f"{task_id}_upscaled.png")
+    if _safe_task_id(task_id):
+        path = os.path.join(app.config['OUTPUT_FOLDER'], task_id + '_upscaled.png')
+        if os.path.exists(path):
+            return send_file(path, as_attachment=True, download_name=f"{task_id}_upscaled.png")
 
     return jsonify({'error': 'Not ready'}), 404
 
@@ -588,4 +597,7 @@ if __name__ == '__main__':
     for folder in ('uploads', 'outputs', 'frames'):
         os.makedirs(folder, exist_ok=True)
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=port)
+    # Debug mode exposes the Werkzeug debugger (remote code execution) —
+    # never enable it by default on 0.0.0.0. Opt in with FLASK_DEBUG=1.
+    debug = os.environ.get('FLASK_DEBUG', '0') == '1'
+    app.run(debug=debug, host='0.0.0.0', port=port)
