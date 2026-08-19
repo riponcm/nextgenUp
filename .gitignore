@@ -9,6 +9,7 @@ __pycache__/
 uploads/
 outputs/
 frames/
+tasks.db
 
 # Test files
 test_*.mp4

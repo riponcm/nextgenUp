@@ -1,8 +1,13 @@
 /**
  * Upscale4K — Image upscaling controller.
+ * Single-image modes: Quick (browser AI), Quality (server FFmpeg),
+ * Enhance (browser AI, same size), Ultra (server AI).
+ * Batch mode: multiple images through any mode, zip download.
  */
 (function () {
     'use strict';
+
+    const MODEL_PATH = '/static/models/realesr-general-x4v3.onnx';
 
     // --- State ---
     const imgState = {
@@ -12,6 +17,15 @@
         selectedScale: 4,
         processing: false,
         file: null,
+        originalUrl: null,
+        resultUrl: null,
+        resultBlob: null,
+    };
+
+    const batch = {
+        items: [],       // { file, url, status, blob, el }
+        running: false,
+        scale: 4,
     };
 
     // --- DOM refs ---
@@ -28,30 +42,45 @@
     const imgProgressFill = $('#img-progress-fill');
     const imgProgressMessage = $('#img-progress-message');
     const imgProgressPercent = $('#img-progress-percent');
-    const imgProgressDetail = $('#img-progress-detail');
     const imgProgressEta = $('#img-progress-eta');
     const imgDownloadSection = $('#img-download-section');
     const imgDownloadBtn = $('#img-download-btn');
     const imgDownloadDetails = $('#img-download-details');
     const imgNewRow = $('#img-new-row');
     const imgNewBtn = $('#img-new-btn');
+    // Compare slider
+    const compareSection = $('#img-compare-section');
+    const compareBox = $('#compare-box');
+    const compareBefore = $('#compare-before');
+    const compareAfter = $('#compare-after');
+    const compareBeforeWrap = $('#compare-before-wrap');
+    const compareHandle = $('#compare-handle');
+    // Batch
+    const batchSection = $('#img-batch-section');
+    const batchTitle = $('#batch-title');
+    const batchSub = $('#batch-sub');
+    const batchGrid = $('#batch-grid');
+    const batchStartBtn = $('#batch-start-btn');
+    const batchZipBtn = $('#batch-zip-btn');
+    const batchResetBtn = $('#batch-reset-btn');
+    const batchModeSel = $('#batch-mode');
+    const batchProgressLabel = $('#batch-progress-label');
 
     // --- Init ---
     bindImageEvents();
+    initCompareSlider();
 
     function bindImageEvents() {
-        // Dropzone
         imgDropzone.addEventListener('click', () => imgFileInput.click());
         imgDropzone.addEventListener('dragover', (e) => { e.preventDefault(); imgDropzone.classList.add('drag-over'); });
         imgDropzone.addEventListener('dragleave', () => imgDropzone.classList.remove('drag-over'));
         imgDropzone.addEventListener('drop', (e) => {
             e.preventDefault();
             imgDropzone.classList.remove('drag-over');
-            const files = e.dataTransfer.files;
-            if (files.length) handleImageFile(files[0]);
+            if (e.dataTransfer.files.length) handleImageFiles(e.dataTransfer.files);
         });
         imgFileInput.addEventListener('change', () => {
-            if (imgFileInput.files.length) handleImageFile(imgFileInput.files[0]);
+            if (imgFileInput.files.length) handleImageFiles(imgFileInput.files);
         });
 
         // Mode selection
@@ -66,7 +95,7 @@
             });
         });
 
-        // Scale buttons
+        // Scale buttons (single mode)
         document.querySelectorAll('[data-imgscale]').forEach((btn) => {
             btn.addEventListener('click', () => {
                 if (imgState.processing) return;
@@ -77,33 +106,55 @@
             });
         });
 
-        // Upscale button
+        // Scale buttons (batch)
+        document.querySelectorAll('[data-batchscale]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                if (batch.running) return;
+                document.querySelectorAll('[data-batchscale]').forEach((b) => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                batch.scale = parseInt(btn.dataset.batchscale);
+            });
+        });
+
         imgUpscaleBtn.addEventListener('click', startImageUpscale);
-
-        // Download
         imgDownloadBtn.addEventListener('click', downloadImageResult);
-
-        // New image
         imgNewBtn.addEventListener('click', resetImageApp);
+
+        batchStartBtn.addEventListener('click', startBatch);
+        batchZipBtn.addEventListener('click', downloadBatchZip);
+        batchResetBtn.addEventListener('click', resetBatch);
     }
 
-    async function handleImageFile(file) {
-        if (!file.type.startsWith('image/') && !file.name.match(/\.(png|jpe?g|webp|bmp|tiff?)$/i)) {
-            showToast('Please select an image file.');
-            return;
-        }
-        if (file.size > 50 * 1024 * 1024) {
-            showToast('File too large. Maximum 50MB.');
-            return;
-        }
+    function isValidImage(file) {
+        return file.type.startsWith('image/') || file.name.match(/\.(png|jpe?g|webp|bmp|tiff?)$/i);
+    }
 
+    function handleImageFiles(fileList) {
+        const files = Array.from(fileList).filter((f) => {
+            if (!isValidImage(f)) return false;
+            if (f.size > 50 * 1024 * 1024) return false;
+            return true;
+        });
+        if (!files.length) {
+            showToast('Please select image files under 50MB.');
+            return;
+        }
+        if (files.length === 1) {
+            handleSingleImage(files[0]);
+        } else {
+            enterBatch(files);
+        }
+    }
+
+    // ============================== SINGLE IMAGE ==============================
+
+    function handleSingleImage(file) {
         imgState.file = file;
 
-        // Show preview immediately
-        const url = URL.createObjectURL(file);
-        imgOriginal.src = url;
+        if (imgState.originalUrl) URL.revokeObjectURL(imgState.originalUrl);
+        imgState.originalUrl = URL.createObjectURL(file);
+        imgOriginal.src = imgState.originalUrl;
 
-        // Get dimensions from the loaded image
         imgOriginal.onload = () => {
             imgState.imageInfo = {
                 width: imgOriginal.naturalWidth,
@@ -129,36 +180,33 @@
 
     function updateModeUI() {
         const scaleGroup = $('#img-scale-buttons').closest('.option-group');
-        const outputLabel = $('#img-output-resolution').closest('.option-group');
         if (imgState.selectedMode === 'enhance') {
-            // Hide scale buttons for enhance mode — same size output
             scaleGroup.style.opacity = '0.3';
             scaleGroup.style.pointerEvents = 'none';
-            if (outputLabel) {
-                outputLabel.querySelector('label').textContent = 'Output Resolution';
-            }
             imgUpscaleBtn.innerHTML = enhanceIconSVG() + ' Enhance Image';
         } else {
             scaleGroup.style.opacity = '1';
             scaleGroup.style.pointerEvents = 'auto';
-            if (outputLabel) {
-                outputLabel.querySelector('label').textContent = 'Output Resolution';
-            }
             imgUpscaleBtn.innerHTML = upscaleIconSVG() + ' Start Upscaling';
         }
+        // Face restoration runs on the server — only offered in Ultra mode
+        const faceGroup = $('#face-restore-group');
+        if (faceGroup) faceGroup.classList.toggle('hidden', imgState.selectedMode !== 'ultra');
     }
 
     function updateImgOutputRes() {
         if (!imgState.imageInfo) return;
         if (imgState.selectedMode === 'enhance') {
-            // Same resolution for enhance
             $('#img-output-resolution').textContent = `${imgState.imageInfo.width} x ${imgState.imageInfo.height} (enhanced)`;
             return;
         }
         let w = imgState.imageInfo.width * imgState.selectedScale;
         let h = imgState.imageInfo.height * imgState.selectedScale;
-        // Cap at 8K for images
-        if (w > 7680) { const r = 7680 / w; w = 7680; h = Math.round(h * r); }
+        const maxDim = 7680;
+        if (w > maxDim || h > maxDim) {
+            if (w >= h) { const r = maxDim / w; w = maxDim; h = Math.round(h * r); }
+            else { const r = maxDim / h; h = maxDim; w = Math.round(w * r); }
+        }
         w = w - (w % 2);
         h = h - (h % 2);
         $('#img-output-resolution').textContent = `${w} x ${h}`;
@@ -171,6 +219,7 @@
         imgUpscaleBtn.disabled = true;
         imgProgressSection.classList.remove('hidden');
         imgDownloadSection.classList.add('hidden');
+        compareSection.classList.add('hidden');
         imgNewRow.classList.add('hidden');
 
         const startTime = Date.now();
@@ -179,8 +228,10 @@
             await runEnhance(startTime);
         } else if (imgState.selectedMode === 'quick') {
             await runQuickUpscale(startTime);
+        } else if (imgState.selectedMode === 'ultra') {
+            await runServerUpscale(startTime, 'ai');
         } else {
-            await runQualityUpscale(startTime);
+            await runServerUpscale(startTime, 'ffmpeg');
         }
     }
 
@@ -190,69 +241,22 @@
             updateImgProgress({ progress: 0, message: 'Loading AI model...' }, startTime);
 
             const upscaler = new ProUpscaler();
-            await upscaler.init('/static/models/realesr-general-x4v3.onnx');
+            await upscaler.init(MODEL_PATH);
             const backend = upscaler.getBackend();
             updateImgProgress({ progress: 10, message: `Model loaded (${backend.toUpperCase()})` }, startTime);
 
-            // Draw image to canvas to get ImageData
-            const canvas = $('#img-input-canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = imgOriginal.naturalWidth;
-            canvas.height = imgOriginal.naturalHeight;
-            ctx.drawImage(imgOriginal, 0, 0);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-            updateImgProgress({ progress: 15, message: `AI upscaling image [${backend.toUpperCase()}]...` }, startTime);
-
-            // Track tile progress
             upscaler.onTileProgress = (done, total) => {
                 const pct = Math.min(90, 15 + Math.round((done / total) * 75));
                 updateImgProgress({ progress: pct, message: `AI upscaling tile ${done}/${total} [${backend.toUpperCase()}]` }, startTime);
             };
 
-            const upscaled = await upscaler.processFrame(imageData);
+            const finalData = await localUpscaleImageData(imgOriginal, upscaler, 'quick', imgState.selectedScale);
 
-            updateImgProgress({ progress: 92, message: 'Rendering result...' }, startTime);
-
-            // If user chose 2x but model is 4x, we downscale the output
-            let finalData = upscaled;
-            if (imgState.selectedScale === 2) {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = upscaled.width;
-                tempCanvas.height = upscaled.height;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.putImageData(upscaled, 0, 0);
-
-                const halfCanvas = document.createElement('canvas');
-                halfCanvas.width = Math.round(upscaled.width / 2);
-                halfCanvas.height = Math.round(upscaled.height / 2);
-                const halfCtx = halfCanvas.getContext('2d');
-                halfCtx.drawImage(tempCanvas, 0, 0, halfCanvas.width, halfCanvas.height);
-
-                finalData = halfCtx.getImageData(0, 0, halfCanvas.width, halfCanvas.height);
-            }
-
-            // Draw to output canvas
-            const outCanvas = $('#img-output-canvas');
-            outCanvas.width = finalData.width;
-            outCanvas.height = finalData.height;
-            const outCtx = outCanvas.getContext('2d');
-            outCtx.putImageData(finalData, 0, 0);
-
-            // Convert to blob for display and download
-            const blob = await new Promise((resolve) => outCanvas.toBlob(resolve, 'image/png'));
+            updateImgProgress({ progress: 95, message: 'Rendering result...' }, startTime);
+            const blob = await imageDataToBlob(finalData);
             const resultUrl = URL.createObjectURL(blob);
 
-            imgUpscaled.src = resultUrl;
-            imgUpscaled.classList.remove('hidden');
-            imgOutputPlaceholder.classList.add('hidden');
-            $('#img-upscaled-res').textContent = `${finalData.width}x${finalData.height}`;
-
-            // Store blob URL for download
-            imgState.resultUrl = resultUrl;
-            imgState.resultBlob = blob;
-
-            onImageUpscaleComplete(finalData.width, finalData.height, backend);
+            showSingleResult(resultUrl, blob, finalData.width, finalData.height, backend.toUpperCase());
             upscaler.dispose();
         } catch (err) {
             onImageUpscaleError('Quick upscale failed: ' + err.message);
@@ -265,130 +269,110 @@
             updateImgProgress({ progress: 0, message: 'Loading AI model...' }, startTime);
 
             const upscaler = new ProUpscaler();
-            await upscaler.init('/static/models/realesr-general-x4v3.onnx');
+            await upscaler.init(MODEL_PATH);
             const backend = upscaler.getBackend();
             updateImgProgress({ progress: 10, message: `Model loaded (${backend.toUpperCase()})` }, startTime);
 
-            // Draw original image to canvas
-            const canvas = $('#img-input-canvas');
-            const ctx = canvas.getContext('2d');
-            const origW = imgOriginal.naturalWidth;
-            const origH = imgOriginal.naturalHeight;
-            canvas.width = origW;
-            canvas.height = origH;
-            ctx.drawImage(imgOriginal, 0, 0);
-            const imageData = ctx.getImageData(0, 0, origW, origH);
-
-            updateImgProgress({ progress: 15, message: `Enhancing with AI [${backend.toUpperCase()}]...` }, startTime);
-
-            // Track tile progress
             upscaler.onTileProgress = (done, total) => {
                 const pct = Math.min(80, 15 + Math.round((done / total) * 65));
                 updateImgProgress({ progress: pct, message: `AI enhancing tile ${done}/${total} [${backend.toUpperCase()}]` }, startTime);
             };
 
-            // AI upscale to 4x
-            const upscaled = await upscaler.processFrame(imageData);
-
-            updateImgProgress({ progress: 85, message: 'Downscaling to original resolution...' }, startTime);
-
-            // Render 4x result to a temp canvas
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = upscaled.width;
-            tempCanvas.height = upscaled.height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.putImageData(upscaled, 0, 0);
-
-            // Downscale back to original size using high-quality canvas resampling
-            const outCanvas = $('#img-output-canvas');
-            outCanvas.width = origW;
-            outCanvas.height = origH;
-            const outCtx = outCanvas.getContext('2d');
-            outCtx.imageSmoothingEnabled = true;
-            outCtx.imageSmoothingQuality = 'high';
-            outCtx.drawImage(tempCanvas, 0, 0, origW, origH);
+            const finalData = await localUpscaleImageData(imgOriginal, upscaler, 'enhance', 4);
 
             updateImgProgress({ progress: 95, message: 'Rendering result...' }, startTime);
-
-            // Convert to blob
-            const blob = await new Promise((resolve) => outCanvas.toBlob(resolve, 'image/png'));
+            const blob = await imageDataToBlob(finalData);
             const resultUrl = URL.createObjectURL(blob);
 
-            imgUpscaled.src = resultUrl;
-            imgUpscaled.classList.remove('hidden');
-            imgOutputPlaceholder.classList.add('hidden');
-            $('#img-upscaled-res').textContent = `${origW}x${origH}`;
-
-            imgState.resultUrl = resultUrl;
-            imgState.resultBlob = blob;
-
-            onImageUpscaleComplete(origW, origH, `${backend.toUpperCase()} Enhanced`);
+            showSingleResult(resultUrl, blob, finalData.width, finalData.height, `${backend.toUpperCase()} Enhanced`);
             upscaler.dispose();
         } catch (err) {
             onImageUpscaleError('Enhance failed: ' + err.message);
         }
     }
 
-    // --- Quality Mode (server-side FFmpeg) ---
-    async function runQualityUpscale(startTime) {
+    // --- Server Modes: Quality (FFmpeg) and Ultra (server AI) ---
+    async function runServerUpscale(startTime, serverMode) {
         try {
             updateImgProgress({ progress: 0, message: 'Uploading image...' }, startTime);
 
             const formData = new FormData();
             formData.append('image', imgState.file);
-            formData.append('scale', imgState.selectedScale);
 
             const res = await fetch('/api/image/upload', { method: 'POST', body: formData });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Upload failed');
 
             imgState.taskId = data.task_id;
-            updateImgProgress({ progress: 20, message: 'Upscaling on server...' }, startTime);
+            updateImgProgress({ progress: 15, message: 'Processing on server...' }, startTime);
 
-            // Start upscale
+            const faceCheck = $('#face-restore-check');
             const upRes = await fetch('/api/image/upscale', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: data.task_id, scale: imgState.selectedScale }),
+                body: JSON.stringify({
+                    task_id: data.task_id,
+                    scale: imgState.selectedScale,
+                    mode: serverMode,
+                    face_restore: !!(serverMode === 'ai' && faceCheck && faceCheck.checked),
+                }),
             });
-            if (!upRes.ok) throw new Error('Failed to start upscale');
+            if (!upRes.ok) {
+                const err = await upRes.json().catch(() => ({}));
+                throw new Error(err.error || 'Failed to start upscale');
+            }
 
-            // Poll for completion
-            const pollInterval = setInterval(async () => {
+            const statusData = await pollImageStatus(data.task_id, (s) => updateImgProgress(s, startTime));
+
+            const imgUrl = `/api/image/download/${data.task_id}`;
+            const outW = statusData.output_width || imgState.imageInfo.width * imgState.selectedScale;
+            const outH = statusData.output_height || imgState.imageInfo.height * imgState.selectedScale;
+
+            showSingleResult(imgUrl, null, outW, outH, serverMode === 'ai' ? 'Server AI' : 'FFmpeg');
+        } catch (err) {
+            onImageUpscaleError('Upscale failed: ' + err.message);
+        }
+    }
+
+    function pollImageStatus(taskId, onProgress) {
+        return new Promise((resolve, reject) => {
+            const interval = setInterval(async () => {
                 try {
-                    const statusRes = await fetch(`/api/image/status/${data.task_id}`);
-                    const statusData = await statusRes.json();
-
-                    updateImgProgress({ progress: statusData.progress || 50, message: statusData.message || 'Processing...' }, startTime);
-
-                    if (statusData.status === 'completed') {
-                        clearInterval(pollInterval);
-
-                        // Show result
-                        const imgUrl = `/api/image/download/${data.task_id}`;
-                        imgUpscaled.src = imgUrl;
-                        imgUpscaled.classList.remove('hidden');
-                        imgOutputPlaceholder.classList.add('hidden');
-
-                        imgState.resultUrl = imgUrl;
-
-                        const outW = statusData.output_width || imgState.imageInfo.width * imgState.selectedScale;
-                        const outH = statusData.output_height || imgState.imageInfo.height * imgState.selectedScale;
-                        $('#img-upscaled-res').textContent = `${outW}x${outH}`;
-
-                        onImageUpscaleComplete(outW, outH, 'FFmpeg');
-                    } else if (statusData.status === 'error') {
-                        clearInterval(pollInterval);
-                        onImageUpscaleError(statusData.message || 'Server error');
-                    }
-                } catch {
-                    clearInterval(pollInterval);
-                    onImageUpscaleError('Connection lost');
+                    const res = await fetch(`/api/image/status/${taskId}`);
+                    const s = await res.json();
+                    if (onProgress) onProgress({ progress: s.progress || 50, message: s.message || 'Processing...' });
+                    if (s.status === 'completed') { clearInterval(interval); resolve(s); }
+                    else if (s.status === 'error') { clearInterval(interval); reject(new Error(s.message || 'Server error')); }
+                } catch (e) {
+                    clearInterval(interval);
+                    reject(new Error('Connection lost'));
                 }
             }, 500);
-        } catch (err) {
-            onImageUpscaleError('Quality upscale failed: ' + err.message);
-        }
+        });
+    }
+
+    function showSingleResult(resultUrl, blob, outW, outH, method) {
+        imgUpscaled.src = resultUrl;
+        imgUpscaled.classList.remove('hidden');
+        imgOutputPlaceholder.classList.add('hidden');
+        $('#img-upscaled-res').textContent = `${outW}x${outH}`;
+
+        imgState.resultUrl = resultUrl;
+        imgState.resultBlob = blob;
+
+        imgState.processing = false;
+        imgProgressSection.classList.add('hidden');
+        imgDownloadSection.classList.remove('hidden');
+        imgNewRow.classList.remove('hidden');
+        imgUpscaleBtn.disabled = false;
+        updateModeUI();
+
+        const label = imgState.selectedMode === 'enhance'
+            ? `${method} — ${outW} x ${outH}`
+            : `${method} upscaled to ${outW} x ${outH}`;
+        imgDownloadDetails.textContent = label;
+
+        showCompare(imgState.originalUrl, resultUrl);
     }
 
     function updateImgProgress(data, startTime) {
@@ -404,36 +388,16 @@
         }
     }
 
-    function onImageUpscaleComplete(outW, outH, method) {
-        imgState.processing = false;
-        imgProgressSection.classList.add('hidden');
-        imgDownloadSection.classList.remove('hidden');
-        imgNewRow.classList.remove('hidden');
-        imgUpscaleBtn.disabled = false;
-        if (imgState.selectedMode === 'enhance') {
-            imgUpscaleBtn.innerHTML = enhanceIconSVG() + ' Enhance Image';
-            imgDownloadDetails.textContent = `${method} — ${outW} x ${outH}`;
-        } else {
-            imgUpscaleBtn.innerHTML = upscaleIconSVG() + ' Start Upscaling';
-            imgDownloadDetails.textContent = `${method} upscaled to ${outW} x ${outH}`;
-        }
-    }
-
     function onImageUpscaleError(msg) {
         imgState.processing = false;
         imgProgressSection.classList.add('hidden');
         imgUpscaleBtn.disabled = false;
-        if (imgState.selectedMode === 'enhance') {
-            imgUpscaleBtn.innerHTML = enhanceIconSVG() + ' Enhance Image';
-        } else {
-            imgUpscaleBtn.innerHTML = upscaleIconSVG() + ' Start Upscaling';
-        }
+        updateModeUI();
         showToast('Error: ' + msg);
     }
 
     function downloadImageResult() {
         if (imgState.resultBlob) {
-            // Quick mode — blob download
             const a = document.createElement('a');
             a.href = imgState.resultUrl;
             const stem = imgState.file ? imgState.file.name.replace(/\.[^.]+$/, '') : 'image';
@@ -442,7 +406,6 @@
             a.click();
             document.body.removeChild(a);
         } else if (imgState.taskId) {
-            // Quality mode — server download
             window.open(`/api/image/download/${imgState.taskId}`, '_blank');
         }
     }
@@ -459,6 +422,7 @@
         imgAppSection.classList.add('hidden');
         imgProgressSection.classList.add('hidden');
         imgDownloadSection.classList.add('hidden');
+        compareSection.classList.add('hidden');
         imgNewRow.classList.add('hidden');
 
         imgOriginal.src = '';
@@ -468,7 +432,285 @@
         imgFileInput.value = '';
     }
 
-    // --- Utils (shared signatures with app.js) ---
+    // ============================== LOCAL AI HELPERS ==============================
+
+    /** Run browser AI on an image element or bitmap. mode: 'quick' | 'enhance'. */
+    async function localUpscaleImageData(source, upscaler, mode, scale) {
+        const srcW = source.naturalWidth || source.width;
+        const srcH = source.naturalHeight || source.height;
+
+        const canvas = $('#img-input-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = srcW;
+        canvas.height = srcH;
+        ctx.drawImage(source, 0, 0);
+        const imageData = ctx.getImageData(0, 0, srcW, srcH);
+
+        const upscaled = await upscaler.processFrame(imageData);
+
+        let targetW, targetH;
+        if (mode === 'enhance') {
+            targetW = srcW; targetH = srcH;
+        } else if (scale === 2) {
+            targetW = srcW * 2; targetH = srcH * 2;
+        } else {
+            return upscaled;
+        }
+
+        // High-quality downscale via canvas
+        const tmp = document.createElement('canvas');
+        tmp.width = upscaled.width;
+        tmp.height = upscaled.height;
+        tmp.getContext('2d').putImageData(upscaled, 0, 0);
+
+        const out = document.createElement('canvas');
+        out.width = targetW;
+        out.height = targetH;
+        const outCtx = out.getContext('2d');
+        outCtx.imageSmoothingEnabled = true;
+        outCtx.imageSmoothingQuality = 'high';
+        outCtx.drawImage(tmp, 0, 0, targetW, targetH);
+        return outCtx.getImageData(0, 0, targetW, targetH);
+    }
+
+    function imageDataToBlob(imageData) {
+        const canvas = $('#img-output-canvas');
+        canvas.width = imageData.width;
+        canvas.height = imageData.height;
+        canvas.getContext('2d').putImageData(imageData, 0, 0);
+        return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    }
+
+    // ============================== COMPARE SLIDER ==============================
+
+    function initCompareSlider() {
+        let dragging = false;
+
+        const setPos = (clientX) => {
+            const rect = compareBox.getBoundingClientRect();
+            let pct = ((clientX - rect.left) / rect.width) * 100;
+            pct = Math.max(2, Math.min(98, pct));
+            compareBeforeWrap.style.width = pct + '%';
+            compareHandle.style.left = pct + '%';
+        };
+
+        compareBox.addEventListener('pointerdown', (e) => {
+            dragging = true;
+            compareBox.setPointerCapture(e.pointerId);
+            setPos(e.clientX);
+        });
+        compareBox.addEventListener('pointermove', (e) => { if (dragging) setPos(e.clientX); });
+        compareBox.addEventListener('pointerup', () => { dragging = false; });
+        compareBox.addEventListener('pointercancel', () => { dragging = false; });
+
+        window.addEventListener('resize', syncCompareSizes);
+    }
+
+    function syncCompareSizes() {
+        if (compareSection.classList.contains('hidden')) return;
+        // The "before" image must render at exactly the same size as the
+        // "after" image so the two halves line up.
+        compareBefore.style.width = compareAfter.clientWidth + 'px';
+        compareBefore.style.height = compareAfter.clientHeight + 'px';
+    }
+
+    function showCompare(beforeUrl, afterUrl) {
+        if (!beforeUrl || !afterUrl) return;
+        compareBefore.src = beforeUrl;
+        compareAfter.src = afterUrl;
+        compareSection.classList.remove('hidden');
+        compareBeforeWrap.style.width = '50%';
+        compareHandle.style.left = '50%';
+        compareAfter.onload = syncCompareSizes;
+        requestAnimationFrame(syncCompareSizes);
+    }
+
+    // ============================== BATCH ==============================
+
+    function enterBatch(files) {
+        resetBatchState();
+        batch.items = files.map((file) => ({
+            file,
+            url: URL.createObjectURL(file),
+            status: 'pending',
+            blob: null,
+            el: null,
+        }));
+
+        imgUploadSection.classList.add('hidden');
+        imgAppSection.classList.add('hidden');
+        batchSection.classList.remove('hidden');
+
+        batchTitle.textContent = `Batch: ${batch.items.length} images`;
+        batchSub.textContent = 'Pick a mode and scale, then start';
+        batchProgressLabel.textContent = '—';
+        batchZipBtn.classList.add('hidden');
+        batchStartBtn.disabled = false;
+
+        batchGrid.innerHTML = '';
+        batch.items.forEach((item) => {
+            const div = document.createElement('div');
+            div.className = 'batch-item';
+            const img = document.createElement('img');
+            img.src = item.url;
+            const info = document.createElement('div');
+            info.className = 'batch-item-info';
+            const name = document.createElement('span');
+            name.className = 'batch-item-name';
+            name.textContent = item.file.name;
+            const status = document.createElement('span');
+            status.className = 'batch-status pending';
+            status.textContent = 'queued';
+            info.appendChild(name);
+            info.appendChild(status);
+            div.appendChild(img);
+            div.appendChild(info);
+            batchGrid.appendChild(div);
+            item.el = { status, info, img };
+        });
+    }
+
+    function setItemStatus(item, cls, text) {
+        item.el.status.className = 'batch-status ' + cls;
+        item.el.status.textContent = text;
+    }
+
+    async function startBatch() {
+        if (batch.running || !batch.items.length) return;
+        batch.running = true;
+        batchStartBtn.disabled = true;
+        batchZipBtn.classList.add('hidden');
+
+        const mode = batchModeSel.value;
+        const scale = batch.scale;
+        const isLocal = mode === 'quick' || mode === 'enhance';
+
+        let upscaler = null;
+        try {
+            if (isLocal) {
+                batchSub.textContent = 'Loading AI model...';
+                upscaler = new ProUpscaler();
+                await upscaler.init(MODEL_PATH);
+                batchSub.textContent = `Running in your browser (${upscaler.getBackend().toUpperCase()})`;
+            } else {
+                batchSub.textContent = mode === 'ultra' ? 'Running on server (AI)' : 'Running on server (FFmpeg)';
+            }
+
+            let done = 0;
+            for (const item of batch.items) {
+                batchProgressLabel.textContent = `${done + 1} / ${batch.items.length}`;
+                setItemStatus(item, 'working', '0%');
+                try {
+                    if (isLocal) {
+                        upscaler.onTileProgress = (d, t) => setItemStatus(item, 'working', Math.round((d / t) * 100) + '%');
+                        const bitmap = await createImageBitmap(item.file);
+                        const data = await localUpscaleImageData(bitmap, upscaler, mode, scale);
+                        bitmap.close();
+                        item.blob = await imageDataToBlob(data);
+                    } else {
+                        item.blob = await serverProcessToBlob(item.file, mode === 'ultra' ? 'ai' : 'ffmpeg', scale,
+                            (pct) => setItemStatus(item, 'working', pct + '%'));
+                    }
+                    setItemStatus(item, 'done', 'done');
+                    addItemDownloadLink(item);
+                } catch (e) {
+                    console.error('batch item failed', e);
+                    setItemStatus(item, 'failed', 'failed');
+                }
+                done++;
+            }
+
+            batchProgressLabel.textContent = 'Complete';
+            batchSub.textContent = `${batch.items.filter(i => i.blob).length} of ${batch.items.length} succeeded`;
+            if (batch.items.some(i => i.blob)) batchZipBtn.classList.remove('hidden');
+        } catch (err) {
+            showToast('Batch failed: ' + err.message);
+        } finally {
+            if (upscaler) upscaler.dispose();
+            batch.running = false;
+            batchStartBtn.disabled = false;
+        }
+    }
+
+    async function serverProcessToBlob(file, serverMode, scale, onPct) {
+        const formData = new FormData();
+        formData.append('image', file);
+        const res = await fetch('/api/image/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+        const upRes = await fetch('/api/image/upscale', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: data.task_id, scale, mode: serverMode }),
+        });
+        if (!upRes.ok) {
+            const err = await upRes.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to start');
+        }
+
+        await pollImageStatus(data.task_id, (s) => onPct && onPct(s.progress || 0));
+
+        const dl = await fetch(`/api/image/download/${data.task_id}`);
+        if (!dl.ok) throw new Error('Download failed');
+        return await dl.blob();
+    }
+
+    function addItemDownloadLink(item) {
+        const a = document.createElement('a');
+        a.textContent = 'save';
+        a.href = URL.createObjectURL(item.blob);
+        a.download = item.file.name.replace(/\.[^.]+$/, '') + '_upscaled.png';
+        item.el.info.appendChild(a);
+        // Show the result as the thumbnail
+        item.el.img.src = a.href;
+    }
+
+    async function downloadBatchZip() {
+        if (typeof JSZip === 'undefined') {
+            showToast('JSZip not loaded — check your connection.');
+            return;
+        }
+        const zip = new JSZip();
+        for (const item of batch.items) {
+            if (item.blob) {
+                zip.file(item.file.name.replace(/\.[^.]+$/, '') + '_upscaled.png', item.blob);
+            }
+        }
+        batchZipBtn.disabled = true;
+        batchZipBtn.textContent = 'Zipping...';
+        try {
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'upscaled_images.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+        } finally {
+            batchZipBtn.disabled = false;
+            batchZipBtn.textContent = 'Download All (.zip)';
+        }
+    }
+
+    function resetBatchState() {
+        batch.items.forEach((i) => { if (i.url) URL.revokeObjectURL(i.url); });
+        batch.items = [];
+        batch.running = false;
+    }
+
+    function resetBatch() {
+        if (batch.running) return;
+        resetBatchState();
+        batchGrid.innerHTML = '';
+        batchSection.classList.add('hidden');
+        imgUploadSection.classList.remove('hidden');
+        imgFileInput.value = '';
+    }
+
+    // ============================== UTILS ==============================
+
     function formatDuration(seconds) {
         const m = Math.floor(seconds / 60);
         const s = Math.floor(seconds % 60);

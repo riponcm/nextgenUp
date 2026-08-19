@@ -293,19 +293,14 @@
                 }, startTime);
             };
 
-            for (let i = 0; i < totalFrames; i++) {
-                // Seek to frame
-                video.currentTime = i / fps;
-                await new Promise((resolve) => { video.onseeked = resolve; });
-
-                // Extract frame
+            // Upscale the current video frame and send it to the server.
+            const handleOneFrame = async () => {
                 ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
                 const imageData = ctx.getImageData(0, 0, video.videoWidth, video.videoHeight);
 
                 // AI upscale (runs in Web Worker — UI stays responsive)
                 const upscaled = await upscaler.processFrame(imageData);
 
-                // Draw upscaled to output canvas and get JPEG
                 const outCanvas = $('#output-canvas');
                 outCanvas.width = upscaled.width;
                 outCanvas.height = upscaled.height;
@@ -314,8 +309,7 @@
 
                 const blob = await new Promise((resolve) => outCanvas.toBlob(resolve, 'image/jpeg', 0.95));
 
-                // Send frame to server
-                await fetch(`/api/pro/frame/${state.taskId}/${i}`, {
+                await fetch(`/api/pro/frame/${state.taskId}/${processed}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'image/jpeg' },
                     body: blob,
@@ -328,6 +322,17 @@
                     current_frame: processed,
                     total_frames: totalFrames,
                 }, startTime);
+            };
+
+            // Seek to each frame individually. Slower than
+            // requestVideoFrameCallback streaming, but frame-exact: rVFC
+            // silently drops frames when the tab is occluded or throttled,
+            // which corrupts the output. Extraction isn't the bottleneck —
+            // AI inference is — so correctness wins.
+            for (let i = 0; i < totalFrames; i++) {
+                video.currentTime = i / fps;
+                await new Promise((resolve) => { video.onseeked = resolve; });
+                await handleOneFrame();
             }
 
             // Assemble final video

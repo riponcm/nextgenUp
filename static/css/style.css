@@ -424,7 +424,18 @@ header {
 }
 
 .mode-selector-3 {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.mode-card[data-imgmode="ultra"].selected {
+    border-color: var(--orange);
+    background: rgba(253, 203, 110, 0.04);
+    box-shadow: 0 0 20px rgba(253, 203, 110, 0.25);
+}
+
+.ultra-icon {
+    background: rgba(253, 203, 110, 0.1);
+    color: var(--orange);
 }
 
 .mode-card[data-imgmode="enhance"].selected {
@@ -788,6 +799,175 @@ footer {
     .options-row { flex-wrap: wrap; }
     .upscale-btn { margin-left: 0; width: 100%; justify-content: center; }
     .download-card { flex-direction: column; text-align: center; }
+}
+
+/* === Comparison Slider === */
+.compare-section {
+    margin-bottom: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.compare-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.compare-hint {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.compare-box {
+    position: relative;
+    user-select: none;
+    touch-action: none;
+    background: #000;
+    cursor: ew-resize;
+}
+
+.compare-box img {
+    display: block;
+    width: 100%;
+    max-height: 600px;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.compare-before-wrap {
+    position: absolute;
+    inset: 0;
+    width: 50%;
+    overflow: hidden;
+}
+
+.compare-before-wrap img {
+    max-width: none;
+    height: 100%;
+    object-fit: contain;
+}
+
+.compare-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    background: var(--accent);
+    transform: translateX(-1px);
+}
+
+.compare-knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
+
+/* === Batch === */
+.batch-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding: 16px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    flex-wrap: wrap;
+}
+
+.batch-sub { font-size: 13px; color: var(--text-muted); }
+
+.batch-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.face-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 9px 0;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.face-toggle input { accent-color: var(--accent); }
+
+.batch-select {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    padding: 8px 12px;
+}
+
+.batch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.batch-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.batch-item img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    display: block;
+    background: #000;
+}
+
+.batch-item-info {
+    padding: 8px 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.batch-item-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.batch-status { flex-shrink: 0; font-weight: 600; }
+.batch-status.pending { color: var(--text-dim); }
+.batch-status.working { color: var(--accent); }
+.batch-status.done { color: var(--green); }
+.batch-status.failed { color: var(--red); }
+
+.batch-item a {
+    color: var(--teal);
+    text-decoration: none;
+    flex-shrink: 0;
 }
 
 /* === Error Toast === */

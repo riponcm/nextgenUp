@@ -59,7 +59,7 @@
                 <!-- Image Upload Section -->
                 <section id="img-upload-section">
                     <div id="img-dropzone" class="dropzone">
-                        <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/webp,image/bmp,image/tiff,.png,.jpg,.jpeg,.webp,.bmp,.tiff,.tif" hidden>
+                        <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/webp,image/bmp,image/tiff,.png,.jpg,.jpeg,.webp,.bmp,.tiff,.tif" multiple hidden>
                         <div class="dropzone-content">
                             <div class="dropzone-icon">
                                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -68,9 +68,9 @@
                                     <polyline points="21 15 16 10 5 21"/>
                                 </svg>
                             </div>
-                            <h3>Drop your image here</h3>
-                            <p>or click to browse</p>
-                            <span class="dropzone-hint">PNG, JPG, WebP, BMP, TIFF &bull; Max 50MB</span>
+                            <h3>Drop your images here</h3>
+                            <p>or click to browse &mdash; multiple files for batch mode</p>
+                            <span class="dropzone-hint">PNG, JPG, WebP, BMP, TIFF &bull; Max 50MB each</span>
                         </div>
                     </div>
                 </section>
@@ -171,6 +171,23 @@
                                 </div>
                             </div>
                         </div>
+                        {% if server_ai %}
+                        <div class="mode-card" data-imgmode="ultra" id="img-mode-ultra">
+                            <div class="mode-icon ultra-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 2l3 6 6 .9-4.5 4.2 1.1 6.2L12 16.4 6.4 19.3l1.1-6.2L3 8.9 9 8z"/>
+                                </svg>
+                            </div>
+                            <div class="mode-info">
+                                <h3>Ultra</h3>
+                                <p>Real-ESRGAN AI &bull; On the server</p>
+                                <div class="mode-tags">
+                                    <span class="tag tag-ai">AI Quality</span>
+                                    <span class="tag tag-server">Any device</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
 
                     <!-- Image Options Row -->
@@ -186,6 +203,15 @@
                             <label>Output Resolution</label>
                             <span class="output-res" id="img-output-resolution">-</span>
                         </div>
+                        {% if face_restore %}
+                        <div class="option-group hidden" id="face-restore-group">
+                            <label>Faces</label>
+                            <label class="face-toggle">
+                                <input type="checkbox" id="face-restore-check">
+                                Restore faces (GFPGAN)
+                            </label>
+                        </div>
+                        {% endif %}
                         <button class="upscale-btn" id="img-upscale-btn">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
@@ -207,6 +233,23 @@
                         <div class="progress-footer">
                             <span id="img-progress-detail"></span>
                             <span id="img-progress-eta"></span>
+                        </div>
+                    </div>
+
+                    <!-- Before/After Comparison Slider -->
+                    <div id="img-compare-section" class="compare-section hidden">
+                        <div class="compare-header">
+                            <span class="panel-label">Compare</span>
+                            <span class="compare-hint">Drag the divider &mdash; left: original, right: result</span>
+                        </div>
+                        <div class="compare-box" id="compare-box">
+                            <img id="compare-after" alt="Result">
+                            <div class="compare-before-wrap" id="compare-before-wrap">
+                                <img id="compare-before" alt="Original">
+                            </div>
+                            <div class="compare-handle" id="compare-handle">
+                                <div class="compare-knob">&#8596;</div>
+                            </div>
                         </div>
                     </div>
 
@@ -237,6 +280,44 @@
                             Upload New Image
                         </button>
                     </div>
+                </section>
+
+                <!-- Batch Processing Section (multiple images) -->
+                <section id="img-batch-section" class="hidden">
+                    <div class="batch-toolbar">
+                        <div>
+                            <h3 id="batch-title">Batch: 0 images</h3>
+                            <p class="batch-sub" id="batch-sub">Pick a mode and scale, then start</p>
+                        </div>
+                        <div class="batch-actions">
+                            <button class="upscale-btn" id="batch-start-btn">Start Batch</button>
+                            <button class="download-btn hidden" id="batch-zip-btn">Download All (.zip)</button>
+                            <button class="new-video-btn" id="batch-reset-btn">Cancel</button>
+                        </div>
+                    </div>
+                    <div class="options-row batch-options">
+                        <div class="option-group">
+                            <label>Mode</label>
+                            <select id="batch-mode" class="batch-select">
+                                <option value="quick">Quick &mdash; browser AI</option>
+                                <option value="quality">Quality &mdash; server FFmpeg</option>
+                                <option value="enhance">Enhance &mdash; same size, AI cleanup</option>
+                                {% if server_ai %}<option value="ultra">Ultra &mdash; server AI</option>{% endif %}
+                            </select>
+                        </div>
+                        <div class="option-group">
+                            <label>Scale Factor</label>
+                            <div class="scale-buttons">
+                                <button class="scale-btn" data-batchscale="2">2x</button>
+                                <button class="scale-btn selected" data-batchscale="4">4x</button>
+                            </div>
+                        </div>
+                        <div class="option-group">
+                            <label>Progress</label>
+                            <span class="output-res" id="batch-progress-label">&mdash;</span>
+                        </div>
+                    </div>
+                    <div class="batch-grid" id="batch-grid"></div>
                 </section>
             </main>
 
@@ -432,6 +513,7 @@
     <canvas id="img-output-canvas" style="display:none"></canvas>
 
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="/static/js/pro-upscaler.js"></script>
     <script src="/static/js/app.js"></script>
     <script src="/static/js/image-app.js"></script>

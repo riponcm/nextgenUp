@@ -18,15 +18,26 @@ Open-source AI image & video upscaling that runs entirely on your own machine. U
 | **Quick** | Real-ESRGAN AI (2x/4x) | Your browser GPU |
 | **Quality** | FFmpeg Lanczos + CAS (2x/4x, up to 8K) | Server |
 | **Enhance** | AI 4x upscale → downscale to original size | Your browser GPU |
+| **Ultra** | Real-ESRGAN AI via ONNX Runtime | Server (any device, no WebGPU needed) |
 
 **Enhance** is the mode for "keep my 500x500 photo 500x500, but make it crystal clear" — the AI reconstructs detail at 4x, then a high-quality downscale back to the original size removes noise, JPEG artifacts, and blur.
+
+**Ultra** runs the same AI on the server, so phones, tablets, and browsers without WebGPU on your network get full AI quality.
+
+### Face Restoration (optional)
+GFPGAN v1.4 + YuNet face detection, running server-side through ONNX Runtime. Tick **Restore faces** in Ultra mode — every detected face is aligned, restored, and seamlessly blended back. Enable it by downloading the models via `setup.sh` (~340MB).
+
+### Batch & Compare
+- **Batch mode** — drop multiple images at once, run any mode over the whole set, download everything as a zip
+- **Before/after slider** — drag a divider across the result to compare against the original
 
 Other niceties:
 - Portrait, landscape, and square inputs handled automatically (longer side capped at 4K for video, 8K for images)
 - Live progress with ETA via Server-Sent Events
-- Side-by-side before/after preview
 - Audio preserved on video upscales
 - Encoder auto-detection: libx264 → h264_videotoolbox → libopenh264
+- Tasks persist in SQLite — completed results survive server restarts
+- Auto-cleanup deletes uploads/outputs older than 24h (`CLEANUP_HOURS` env var)
 
 ## Requirements
 
@@ -73,6 +84,7 @@ The AI model is [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) (`realesr-
 |---------|---------|---------|
 | `PORT` | `5000` | Server port |
 | `FLASK_DEBUG` | `0` | Set to `1` for the Werkzeug debugger (never on an exposed host) |
+| `CLEANUP_HOURS` | `24` | Files older than this are auto-deleted |
 
 Upload limit is 2GB (`MAX_CONTENT_LENGTH` in `app.py`).
 
@@ -80,10 +92,12 @@ Upload limit is 2GB (`MAX_CONTENT_LENGTH` in `app.py`).
 
 ```
 app.py                     Flask server: upload, upscale, progress, download
+ai_engine.py               Server-side Real-ESRGAN (ONNX Runtime, tiled)
+face_restore.py            GFPGAN face restoration + YuNet detection
 templates/index.html       Dashboard (sidebar: Image Upscale / Video Upscale)
 static/css/style.css       Dark theme UI
 static/js/app.js           Video controller + tab navigation
-static/js/image-app.js     Image controller (Quick / Quality / Enhance)
+static/js/image-app.js     Image controller (modes, batch, compare slider)
 static/js/pro-upscaler.js  Web Worker wrapper
 static/js/pro-worker.js    ONNX inference worker (tiling, WebGPU/WASM)
 convert_model.py           Optional: convert official PyTorch weights to ONNX
@@ -92,10 +106,9 @@ setup.sh                   One-command setup
 
 ## Roadmap
 
-- [ ] Server-side Real-ESRGAN / HAT for maximum-quality tier
-- [ ] Face restoration (CodeFormer / GFPGAN)
-- [ ] Batch processing
-- [ ] Task persistence (survive server restarts)
+- [ ] Bigger server models (Real-ESRGAN x4plus / HAT) for a maximum-quality tier
+- [ ] Face restoration for video frames
+- [ ] WebCodecs-based video frame extraction (faster Pro mode)
 - [ ] Docker image
 
 ## License

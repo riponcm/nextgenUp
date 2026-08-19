@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import threading
 import time
@@ -12,6 +13,19 @@ import uuid
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, render_template, request, send_file
+
+try:
+    import ai_engine
+    SERVER_AI = ai_engine.available()
+except ImportError:
+    ai_engine = None
+    SERVER_AI = False
+
+try:
+    import face_restore as _face_restore
+    FACE_RESTORE = SERVER_AI and _face_restore.available()
+except Exception:
+    FACE_RESTORE = False
 
 def _find_bin(name):
     """Find a binary in PATH or common locations."""
@@ -37,16 +51,110 @@ tasks = {}
 
 TASK_ID_RE = re.compile(r'^[a-z0-9_]{1,40}$')
 
+DB_PATH = 'tasks.db'
+
 
 def _safe_task_id(task_id):
     """Validate task_id format to prevent path traversal in disk lookups."""
     return bool(TASK_ID_RE.fullmatch(task_id))
 
 
+# --- Task persistence (SQLite) ---
+
+def _db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        'CREATE TABLE IF NOT EXISTS tasks '
+        '(task_id TEXT PRIMARY KEY, data TEXT, updated REAL)'
+    )
+    return conn
+
+
+def save_task(task_id):
+    """Persist a task's JSON-serializable fields so it survives restarts."""
+    task = tasks.get(task_id)
+    if not task:
+        return
+    data = json.dumps({
+        k: v for k, v in task.items()
+        if isinstance(v, (str, int, float, bool, list, dict, type(None)))
+    })
+    try:
+        with _db() as conn:
+            conn.execute(
+                'INSERT OR REPLACE INTO tasks VALUES (?, ?, ?)',
+                (task_id, data, time.time()),
+            )
+    except Exception as e:
+        print(f'[db] save failed for {task_id}: {e}', flush=True)
+
+
+def delete_task(task_id):
+    tasks.pop(task_id, None)
+    try:
+        with _db() as conn:
+            conn.execute('DELETE FROM tasks WHERE task_id = ?', (task_id,))
+    except Exception:
+        pass
+
+
+def load_tasks():
+    try:
+        with _db() as conn:
+            for tid, data in conn.execute('SELECT task_id, data FROM tasks'):
+                try:
+                    task = json.loads(data)
+                except ValueError:
+                    continue
+                # Anything mid-flight when the server died can't resume
+                if task.get('status') in ('processing', 'pro_processing'):
+                    task['status'] = 'error'
+                    task['message'] = 'Interrupted by server restart'
+                tasks[tid] = task
+        print(f'[db] loaded {len(tasks)} task(s)', flush=True)
+    except Exception as e:
+        print(f'[db] load failed: {e}', flush=True)
+
+
+# --- Auto-cleanup of old files ---
+
+CLEANUP_HOURS = float(os.environ.get('CLEANUP_HOURS', 24))
+
+
+def _cleanup_loop():
+    while True:
+        cutoff = time.time() - CLEANUP_HOURS * 3600
+        for folder in ('uploads', 'outputs', 'frames'):
+            try:
+                for entry in os.scandir(folder):
+                    if entry.stat().st_mtime < cutoff:
+                        if entry.is_dir():
+                            shutil.rmtree(entry.path, ignore_errors=True)
+                        else:
+                            os.remove(entry.path)
+            except OSError:
+                pass
+        try:
+            with _db() as conn:
+                old = [r[0] for r in conn.execute(
+                    'SELECT task_id FROM tasks WHERE updated < ?', (cutoff,))]
+            for tid in old:
+                delete_task(tid)
+        except Exception:
+            pass
+        time.sleep(3600)
+
+
 @app.route('/')
 def index():
     model_exists = os.path.exists('static/models/realesr-general-x4v3.onnx')
-    return render_template('index.html', model_available=model_exists)
+    return render_template('index.html', model_available=model_exists,
+                           server_ai=SERVER_AI, face_restore=FACE_RESTORE)
+
+
+@app.route('/api/capabilities')
+def capabilities():
+    return jsonify({'server_ai': SERVER_AI, 'face_restore': FACE_RESTORE})
 
 
 @app.route('/api/upload', methods=['POST'])
@@ -81,6 +189,7 @@ def upload():
         'total_frames': int(info['duration'] * info['fps']),
         'message': 'Ready',
     }
+    save_task(task_id)
 
     return jsonify({'task_id': task_id, 'info': info})
 
@@ -245,6 +354,7 @@ def image_upload():
         'progress': 0,
         'message': 'Ready',
     }
+    save_task(task_id)
 
     return jsonify({'task_id': task_id, 'info': info})
 
@@ -254,16 +364,28 @@ def image_upscale():
     data = request.json or {}
     task_id = data.get('task_id')
     scale = int(data.get('scale', 4))
+    mode = data.get('mode', 'ffmpeg')  # ffmpeg | ai | ai-enhance
 
     task = tasks.get(task_id)
     if not task:
         return jsonify({'error': 'Task not found'}), 404
 
+    if mode in ('ai', 'ai-enhance') and not SERVER_AI:
+        return jsonify({'error': 'Server AI not available on this host'}), 400
+
     task['status'] = 'processing'
     task['progress'] = 10
     task['message'] = 'Starting upscale...'
 
-    thread = threading.Thread(target=_run_image_upscale, args=(task_id, scale), daemon=True)
+    if mode in ('ai', 'ai-enhance'):
+        face = bool(data.get('face_restore')) and FACE_RESTORE
+        target = _run_image_upscale_ai
+        args = (task_id, scale, mode == 'ai-enhance', face)
+    else:
+        target = _run_image_upscale
+        args = (task_id, scale)
+
+    thread = threading.Thread(target=target, args=args, daemon=True)
     thread.start()
 
     return jsonify({'status': 'processing'})
@@ -452,6 +574,44 @@ def _run_image_upscale(task_id, scale):
     except Exception as e:
         task['status'] = 'error'
         task['message'] = str(e)
+    save_task(task_id)
+
+
+def _run_image_upscale_ai(task_id, scale, enhance=False, face=False):
+    """Server-side Real-ESRGAN upscale (or same-size enhance) via ONNX Runtime."""
+    task = tasks[task_id]
+    input_path = task['input']
+
+    output_filename = f"{task_id}_upscaled.png"
+    output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
+
+    def on_tile(done, total):
+        # Leave headroom for the face-restoration pass at the end
+        cap = 85 if face else 95
+        task['progress'] = min(cap, 10 + int(done / total * (cap - 10)))
+        task['message'] = f'AI {"enhancing" if enhance else "upscaling"} tile {done}/{total}'
+
+    try:
+        task['message'] = 'Running AI model on server...'
+        if enhance:
+            out_w, out_h = ai_engine.enhance_image(
+                input_path, output_path, progress_cb=on_tile, face_restore=face)
+        else:
+            out_w, out_h = ai_engine.upscale_image(
+                input_path, output_path, scale=scale, progress_cb=on_tile,
+                face_restore=face)
+
+        task['status'] = 'completed'
+        task['progress'] = 100
+        task['output'] = output_path
+        task['message'] = 'Done!'
+        task['output_width'] = out_w
+        task['output_height'] = out_h
+    except Exception as e:
+        print(f'[image-ai] error: {e}', flush=True)
+        task['status'] = 'error'
+        task['message'] = f'AI upscale error: {str(e)[:200]}'
+    save_task(task_id)
 
 
 def _run_basic_upscale(task_id, scale):
@@ -547,6 +707,7 @@ def _run_basic_upscale(task_id, scale):
     except Exception as e:
         task['status'] = 'error'
         task['message'] = str(e)
+    save_task(task_id)
 
 
 def _run_pro_assemble(task_id, fps):
@@ -591,11 +752,14 @@ def _run_pro_assemble(task_id, fps):
     except Exception as e:
         task['status'] = 'error'
         task['message'] = str(e)
+    save_task(task_id)
 
 
 if __name__ == '__main__':
     for folder in ('uploads', 'outputs', 'frames'):
         os.makedirs(folder, exist_ok=True)
+    load_tasks()
+    threading.Thread(target=_cleanup_loop, daemon=True).start()
     port = int(os.environ.get('PORT', 5000))
     # Debug mode exposes the Werkzeug debugger (remote code execution) —
     # never enable it by default on 0.0.0.0. Opt in with FLASK_DEBUG=1.

@@ -38,6 +38,24 @@ if [ ! -f "$MODEL" ]; then
     echo "Model downloaded."
 fi
 
+# Face restoration models (optional — GFPGAN is ~340MB)
+YUNET="static/models/face_detection_yunet_2023mar.onnx"
+GFPGAN="static/models/GFPGANv1.4.onnx"
+if [ ! -f "$GFPGAN" ]; then
+    read -p "Download face restoration models (GFPGAN, ~340MB)? [y/N] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        [ -f "$YUNET" ] || curl -L -o "$YUNET" \
+            "https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx"
+        curl -L -o "$GFPGAN" \
+            "https://huggingface.co/OwlMaster/AllFilesRope/resolve/main/GFPGANv1.4.onnx"
+        pip install -q opencv-python-headless
+        echo "Face restoration ready."
+    else
+        echo "Skipping. Re-run setup.sh any time to add it."
+    fi
+fi
+
 echo ""
 echo "=== Setup Complete ==="
 echo "Start the app:  source venv/bin/activate && python app.py"
