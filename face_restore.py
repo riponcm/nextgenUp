@@ -18,8 +18,10 @@ except ImportError:
 
 import onnxruntime as ort
 
-GFPGAN_PATH = os.path.join('static', 'models', 'GFPGANv1.4.onnx')
-YUNET_PATH = os.path.join('static', 'models', 'face_detection_yunet_2023mar.onnx')
+import paths
+
+GFPGAN_PATH = paths.find_model('GFPGANv1.4.onnx')
+YUNET_PATH = paths.find_model('face_detection_yunet_2023mar.onnx')
 
 # FFHQ 512x512 five-point template (left eye, right eye, nose, mouth corners)
 FACE_TEMPLATE = np.array([
@@ -35,7 +37,7 @@ _lock = threading.Lock()
 
 
 def available():
-    return CV2_OK and os.path.exists(GFPGAN_PATH) and os.path.exists(YUNET_PATH)
+    return CV2_OK and GFPGAN_PATH is not None and YUNET_PATH is not None
 
 
 def _get_session():

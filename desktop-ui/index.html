@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NextGenUp</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 20px; background: #08080d; color: #8888a0;
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+  }
+  .spinner {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 3px solid #1e1e2a; border-top-color: #6c5ce7;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #err { color: #ff6b6b; font-size: 13px; max-width: 420px; text-align: center; display: none; }
+</style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <div>Starting NextGenUp&hellip;</div>
+  <div id="err"></div>
+  <script>
+    const URL_ = 'http://127.0.0.1:18790/';
+    const started = Date.now();
+    (async function poll() {
+      try {
+        await fetch(URL_ + 'api/capabilities', { mode: 'no-cors' });
+        location.replace(URL_);
+      } catch (e) {
+        if (Date.now() - started > 60000) {
+          document.getElementById('err').style.display = 'block';
+          document.getElementById('err').textContent =
+            'The local engine did not start within 60 seconds. Try restarting the app.';
+          return;
+        }
+        setTimeout(poll, 300);
+      }
+    })();
+  </script>
+</body>
+</html>

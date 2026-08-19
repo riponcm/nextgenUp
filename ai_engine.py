@@ -12,7 +12,10 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 
-MODEL_PATH = os.path.join('static', 'models', 'realesr-general-x4v3.onnx')
+import paths
+
+MODEL_PATH = paths.find_model('realesr-general-x4v3.onnx') or \
+    os.path.join('static', 'models', 'realesr-general-x4v3.onnx')
 MODEL_SCALE = 4
 TILE = 128
 PAD = 12

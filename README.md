@@ -1,6 +1,8 @@
-# Upscale4K
+# NextGenUp
 
 Open-source AI image & video upscaling that runs entirely on your own machine. Upload a low-res photo or video, get a crisp 4K version back — no cloud, no subscription, no watermarks.
+
+Runs as a **web app** (Flask, any browser on your network) or as a **native desktop app** (Tauri) for macOS (Intel + Apple Silicon), Windows x64, and Linux.
 
 **Video upscaling** (Basic FFmpeg / Pro AI) &nbsp;•&nbsp; **Image upscaling** (Quick AI / Quality FFmpeg) &nbsp;•&nbsp; **Image enhancement** (same size, crystal clear)
 
@@ -104,11 +106,48 @@ convert_model.py           Optional: convert official PyTorch weights to ONNX
 setup.sh                   One-command setup
 ```
 
+## Desktop app (Tauri)
+
+The desktop build wraps the same UI in a native window and bundles **everything**: the Python backend (compiled with PyInstaller — users never install Python), FFmpeg, and the Real-ESRGAN model. Install → double-click → done.
+
+**Releases are built by GitHub Actions** ([.github/workflows/desktop.yml](.github/workflows/desktop.yml)). Push a version tag and installers for all four targets appear on the release page:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+| Platform | Installer |
+|----------|-----------|
+| macOS Apple Silicon | `.dmg` |
+| macOS Intel | `.dmg` |
+| Windows x64 | NSIS `.exe` + `.msi` |
+| Linux x64 | `.AppImage` + `.deb` |
+
+You can also run **Actions → Desktop builds → Run workflow** for a test build without tagging (grab the artifacts from the run page).
+
+Local development build (needs Rust + Node):
+
+```bash
+pip install pyinstaller && pyinstaller nextgenup-server.spec
+mkdir -p src-tauri/binaries
+cp dist/nextgenup-server "src-tauri/binaries/nextgenup-server-$(rustc -vV | sed -n 's/host: //p')"
+cp "$(which ffmpeg)" "src-tauri/binaries/ffmpeg-$(rustc -vV | sed -n 's/host: //p')"
+cp "$(which ffprobe)" "src-tauri/binaries/ffprobe-$(rustc -vV | sed -n 's/host: //p')"
+npm install && npx tauri build
+```
+
+Desktop data lives in the OS app-data dir (e.g. `~/Library/Application Support/com.riponcm.nextgenup/` on macOS). To enable **face restoration** in the desktop app, drop `GFPGANv1.4.onnx` into the `models/` folder there — it's not bundled to keep installers small.
+
+Note: the CI bundles GPL FFmpeg builds; the app itself is MIT, FFmpeg keeps its own license.
+
 ## Roadmap
 
+- [x] Desktop app (Tauri) for macOS / Windows / Linux
 - [ ] Bigger server models (Real-ESRGAN x4plus / HAT) for a maximum-quality tier
 - [ ] Face restoration for video frames
 - [ ] WebCodecs-based video frame extraction (faster Pro mode)
+- [ ] In-app GFPGAN model download
 - [ ] Docker image
 
 ## License

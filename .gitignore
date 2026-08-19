@@ -26,3 +26,14 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+
+# Desktop build outputs
+node_modules/
+src-tauri/target/
+src-tauri/binaries/*
+!src-tauri/binaries/.gitkeep
+src-tauri/gen/
+dist/
+build/
+*.spec.bak
+package-lock.json

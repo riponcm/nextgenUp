@@ -7,12 +7,15 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import sys
 import threading
 import time
 import uuid
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, render_template, request, send_file
+
+import paths
 
 try:
     import ai_engine
@@ -28,7 +31,13 @@ except Exception:
     FACE_RESTORE = False
 
 def _find_bin(name):
-    """Find a binary in PATH or common locations."""
+    """Find a binary next to the packaged executable, in PATH, or in
+    common install locations."""
+    exe_name = name + '.exe' if sys.platform == 'win32' else name
+    if paths.EXE_DIR:
+        p = os.path.join(paths.EXE_DIR, exe_name)
+        if os.path.isfile(p):
+            return p
     found = shutil.which(name)
     if found:
         return found
@@ -41,17 +50,19 @@ def _find_bin(name):
 FFMPEG = _find_bin('ffmpeg')
 FFPROBE = _find_bin('ffprobe')
 
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['OUTPUT_FOLDER'] = 'outputs'
-app.config['FRAMES_FOLDER'] = 'frames'
+app = Flask(__name__,
+            template_folder=paths.resource('templates'),
+            static_folder=paths.resource('static'))
+app.config['UPLOAD_FOLDER'] = paths.data('uploads')
+app.config['OUTPUT_FOLDER'] = paths.data('outputs')
+app.config['FRAMES_FOLDER'] = paths.data('frames')
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB
 
 tasks = {}
 
 TASK_ID_RE = re.compile(r'^[a-z0-9_]{1,40}$')
 
-DB_PATH = 'tasks.db'
+DB_PATH = paths.data('tasks.db')
 
 
 def _safe_task_id(task_id):
@@ -124,7 +135,8 @@ CLEANUP_HOURS = float(os.environ.get('CLEANUP_HOURS', 24))
 def _cleanup_loop():
     while True:
         cutoff = time.time() - CLEANUP_HOURS * 3600
-        for folder in ('uploads', 'outputs', 'frames'):
+        for folder in (app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER'],
+                       app.config['FRAMES_FOLDER']):
             try:
                 for entry in os.scandir(folder):
                     if entry.stat().st_mtime < cutoff:
@@ -147,7 +159,7 @@ def _cleanup_loop():
 
 @app.route('/')
 def index():
-    model_exists = os.path.exists('static/models/realesr-general-x4v3.onnx')
+    model_exists = paths.find_model('realesr-general-x4v3.onnx') is not None
     return render_template('index.html', model_available=model_exists,
                            server_ai=SERVER_AI, face_restore=FACE_RESTORE)
 
@@ -756,7 +768,8 @@ def _run_pro_assemble(task_id, fps):
 
 
 if __name__ == '__main__':
-    for folder in ('uploads', 'outputs', 'frames'):
+    for folder in (app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER'],
+                   app.config['FRAMES_FOLDER'], paths.data('models')):
         os.makedirs(folder, exist_ok=True)
     load_tasks()
     threading.Thread(target=_cleanup_loop, daemon=True).start()
