@@ -10,9 +10,25 @@
   <a href="https://github.com/riponcm/nextgenUp/stargazers"><img src="https://img.shields.io/github/stars/riponcm/nextgenUp?style=for-the-badge&color=fdcb6e&label=Stars" alt="GitHub stars"></a>
 </p>
 
-**NextGenUp** turns low-resolution photos and videos into crisp, high-resolution versions — up to 4K for video and 8K for images — using Real-ESRGAN AI models that run entirely on your own machine. No cloud, no subscription, no watermarks, no upload of your files to anyone's server.
+**NextGenUp** is a free, open-source **AI image upscaler and video enhancer**: it turns low-resolution photos and videos into crisp, high-resolution versions — **upscale video to 4K** and **images to 8K** — using Real-ESRGAN super-resolution and GFPGAN face restoration, entirely on your own machine. A free alternative to **Topaz Gigapixel AI** and **Topaz Video AI** with no cloud, no subscription, no watermarks, and no upload of your files to anyone's server.
 
 A [matily.org](https://matily.org) product. Free and open source under the MIT license.
+
+## Why NextGenUp
+
+| | NextGenUp | Topaz Photo / Video AI | Upscayl | Video2X |
+|---|---|---|---|---|
+| Price | Free, MIT | ~$199/year | Free | Free |
+| Image upscaling | Yes, to 8K | Yes | Yes | No |
+| Video upscaling | Yes, to 4K | Yes | No | Yes |
+| Face restoration | Yes (GFPGAN) | Yes | No | No |
+| Same-size enhance mode | Yes | Yes | No | No |
+| Batch + zip export | Yes | Yes | Yes | Partial |
+| Runs fully offline | Yes | Yes | Yes | Yes |
+| Point-and-click GUI | Yes | Yes | Yes | Partial |
+| Also usable from any browser on your network | Yes | No | No | No |
+
+Excellent tools all around — NextGenUp's niche is covering **images and video and faces** in one simple app that is free forever.
 
 ---
 
