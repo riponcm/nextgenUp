@@ -96,8 +96,9 @@ jobs:
       - name: Download FFmpeg (Windows)
         if: startsWith(matrix.os, 'windows')
         run: |
-          curl -L -o ffmpeg.zip "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
-          unzip -o ffmpeg.zip -d fftmp
+          curl -L --retry 4 -o ffmpeg.zip \
+            "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip"
+          unzip -o -q ffmpeg.zip -d fftmp
           FFDIR=$(find fftmp -maxdepth 1 -type d -name "ffmpeg-*" | head -1)
           cp "$FFDIR/bin/ffmpeg.exe"  "src-tauri/binaries/ffmpeg-${{ matrix.target }}.exe"
           cp "$FFDIR/bin/ffprobe.exe" "src-tauri/binaries/ffprobe-${{ matrix.target }}.exe"
