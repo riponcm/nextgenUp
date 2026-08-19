@@ -644,6 +644,23 @@ header {
 #progress-message, #img-progress-message { color: var(--text-muted); }
 #progress-percent, #img-progress-percent { font-weight: 700; color: var(--accent); }
 
+.progress-right { display: flex; align-items: center; gap: 14px; }
+
+.cancel-btn {
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--red);
+    background: transparent;
+    border: 1px solid rgba(255, 107, 107, 0.5);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.cancel-btn:hover { background: rgba(255, 107, 107, 0.12); border-color: var(--red); }
+
 .progress-track {
     height: 6px;
     background: var(--bg-elevated);

@@ -7,6 +7,18 @@ class ProUpscaler {
         this.worker = null;
         this.backend = 'unknown';
         this.onTileProgress = null;
+        this._pendingReject = null;
+    }
+
+    /** Abort immediately: terminate the worker and reject any in-flight call. */
+    cancel() {
+        const reject = this._pendingReject;
+        this._pendingReject = null;
+        if (this.worker) {
+            this.worker.terminate();
+            this.worker = null;
+        }
+        if (reject) reject(new Error('cancelled'));
     }
 
     async init(modelPath) {
@@ -41,8 +53,14 @@ class ProUpscaler {
 
     async processFrame(imageData) {
         return new Promise((resolve, reject) => {
+            if (!this.worker) {
+                reject(new Error('cancelled'));
+                return;
+            }
+            this._pendingReject = reject;
             this.worker.onmessage = (e) => {
                 if (e.data.type === 'frameResult') {
+                    this._pendingReject = null;
                     resolve(new ImageData(
                         new Uint8ClampedArray(e.data.pixels),
                         e.data.width,
@@ -51,6 +69,7 @@ class ProUpscaler {
                 } else if (e.data.type === 'tileProgress' && this.onTileProgress) {
                     this.onTileProgress(e.data.done, e.data.total);
                 } else if (e.data.type === 'error') {
+                    this._pendingReject = null;
                     reject(new Error(e.data.message));
                 }
             };
@@ -66,7 +85,7 @@ class ProUpscaler {
     dispose() {
         if (this.worker) {
             this.worker.postMessage({ type: 'dispose' });
-            setTimeout(() => { this.worker.terminate(); this.worker = null; }, 500);
+            setTimeout(() => { if (this.worker) { this.worker.terminate(); this.worker = null; } }, 500);
         }
     }
 }

@@ -61,6 +61,13 @@ app.config['FRAMES_FOLDER'] = paths.data('frames')
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB
 
 tasks = {}
+# Live subprocess handles per task, so cancel can kill them (not persisted)
+_procs = {}
+
+
+class TaskCancelled(Exception):
+    pass
+
 
 TASK_ID_RE = re.compile(r'^[a-z0-9_]{1,40}$')
 
@@ -303,12 +310,25 @@ def progress(task_id):
                 yield f"data: {json.dumps({'status': 'error', 'message': 'Task not found'})}\n\n"
                 break
             yield f"data: {json.dumps({k: task[k] for k in ('status', 'progress', 'message', 'current_frame', 'total_frames')})}\n\n"
-            if task['status'] in ('completed', 'error'):
+            if task['status'] in ('completed', 'error', 'cancelled'):
                 break
             time.sleep(0.5)
 
     return Response(generate(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
+@app.route('/api/cancel/<task_id>', methods=['POST'])
+@app.route('/api/image/cancel/<task_id>', methods=['POST'])
+def cancel_task(task_id):
+    task = tasks.get(task_id)
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+    task['cancel_requested'] = True
+    proc = _procs.get(task_id)
+    if proc and proc.poll() is None:
+        proc.kill()
+    return jsonify({'status': 'cancelling'})
 
 
 @app.route('/api/download/<task_id>')
@@ -636,7 +656,24 @@ def _run_image_upscale(task_id, scale):
         task['message'] = 'Upscaling with FFmpeg...'
 
         print(f"[image-upscale] Running: {' '.join(cmd)}", flush=True)
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, text=True)
+        _procs[task_id] = process
+        try:
+            _, stderr_out = process.communicate(timeout=120)
+        finally:
+            _procs.pop(task_id, None)
+
+        class _R:  # keep the shape the branches below expect
+            returncode = process.returncode
+            stderr = stderr_out
+        result = _R()
+
+        if task.get('cancel_requested'):
+            task['status'] = 'cancelled'
+            task['message'] = 'Cancelled'
+            save_task(task_id)
+            return
 
         if result.returncode == 0 and os.path.exists(output_path):
             task['status'] = 'completed'
@@ -666,6 +703,8 @@ def _run_image_upscale_ai(task_id, scale, enhance=False, face=False):
     output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
 
     def on_tile(done, total):
+        if task.get('cancel_requested'):
+            raise TaskCancelled()
         # Leave headroom for the face-restoration pass at the end
         cap = 85 if face else 95
         task['progress'] = min(cap, 10 + int(done / total * (cap - 10)))
@@ -687,6 +726,9 @@ def _run_image_upscale_ai(task_id, scale, enhance=False, face=False):
         task['message'] = 'Done!'
         task['output_width'] = out_w
         task['output_height'] = out_h
+    except TaskCancelled:
+        task['status'] = 'cancelled'
+        task['message'] = 'Cancelled'
     except Exception as e:
         print(f'[image-ai] error: {e}', flush=True)
         task['status'] = 'error'
@@ -743,6 +785,7 @@ def _run_basic_upscale(task_id, scale):
         process = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True
         )
+        _procs[task_id] = process
 
         # Drain stderr in a background thread to prevent pipe deadlock.
         # Without this, stderr buffer (64KB) fills up on large videos,
@@ -766,8 +809,15 @@ def _run_basic_upscale(task_id, scale):
                     pass
 
         process.wait()
+        _procs.pop(task_id, None)
         stderr_thread.join(timeout=5)
         stderr_output = ''.join(stderr_chunks)
+
+        if task.get('cancel_requested'):
+            task['status'] = 'cancelled'
+            task['message'] = 'Cancelled'
+            save_task(task_id)
+            return
 
         if process.returncode == 0 and os.path.exists(output_path):
             task['status'] = 'completed'

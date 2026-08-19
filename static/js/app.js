@@ -12,6 +12,8 @@
         selectedScale: 4,
         processing: false,
         file: null,
+        cancelRequested: false,
+        activeUpscaler: null,
     };
 
     // --- DOM refs ---
@@ -196,6 +198,9 @@
         // Upscale button
         upscaleBtn.addEventListener('click', startUpscale);
 
+        // Cancel button
+        $('#cancel-btn').addEventListener('click', cancelVideoJob);
+
         // Download
         downloadBtn.addEventListener('click', downloadResult);
 
@@ -274,9 +279,28 @@
         $('#output-resolution').textContent = `${w} x ${h}`;
     }
 
+    function cancelVideoJob() {
+        if (!state.processing) return;
+        state.cancelRequested = true;
+        if (state.activeUpscaler) state.activeUpscaler.cancel();
+        if (state.taskId) {
+            fetch(`/api/cancel/${state.taskId}`, { method: 'POST' }).catch(() => {});
+        }
+    }
+
+    function onUpscaleCancelled() {
+        state.processing = false;
+        state.activeUpscaler = null;
+        progressSection.classList.add('hidden');
+        upscaleBtn.disabled = false;
+        upscaleBtn.innerHTML = upscaleIconSVG() + ' Start Upscaling';
+        showToast('Cancelled — pick any mode and start again.');
+    }
+
     async function startUpscale() {
         if (state.processing || !state.taskId) return;
         state.processing = true;
+        state.cancelRequested = false;
 
         upscaleBtn.disabled = true;
         progressSection.classList.remove('hidden');
@@ -311,6 +335,9 @@
                 if (data.status === 'completed') {
                     evtSource.close();
                     onUpscaleComplete();
+                } else if (data.status === 'cancelled') {
+                    evtSource.close();
+                    onUpscaleCancelled();
                 } else if (data.status === 'error') {
                     evtSource.close();
                     onUpscaleError(data.message);
@@ -337,6 +364,7 @@
 
             // Initialize Pro upscaler
             const upscaler = new ProUpscaler();
+            state.activeUpscaler = upscaler;
             await upscaler.init('/static/models/realesr-general-x4v3.onnx');
             const backend = upscaler.getBackend();
             updateProgress({ progress: 2, message: `Model loaded (${backend.toUpperCase()})`, current_frame: 0, total_frames: state.videoInfo.duration * state.videoInfo.fps }, startTime);
@@ -413,6 +441,7 @@
             // which corrupts the output. Extraction isn't the bottleneck —
             // AI inference is — so correctness wins.
             for (let i = 0; i < totalFrames; i++) {
+                if (state.cancelRequested) throw new Error('cancelled');
                 video.currentTime = i / fps;
                 await new Promise((resolve) => { video.onseeked = resolve; });
                 await handleOneFrame();
@@ -448,8 +477,13 @@
             }, 1000);
 
             URL.revokeObjectURL(video.src);
+            state.activeUpscaler = null;
             upscaler.dispose();
         } catch (err) {
+            if (state.cancelRequested || err.message === 'cancelled') {
+                onUpscaleCancelled();
+                return;
+            }
             onUpscaleError('Pro upscale failed: ' + err.message);
         }
     }

@@ -20,12 +20,17 @@
         originalUrl: null,
         resultUrl: null,
         resultBlob: null,
+        cancelRequested: false,
+        activeUpscaler: null,
     };
 
     const batch = {
         items: [],       // { file, url, status, blob, el }
         running: false,
         scale: 4,
+        cancelRequested: false,
+        activeUpscaler: null,
+        currentTaskId: null,
     };
 
     // --- DOM refs ---
@@ -119,6 +124,7 @@
         imgUpscaleBtn.addEventListener('click', startImageUpscale);
         imgDownloadBtn.addEventListener('click', downloadImageResult);
         imgNewBtn.addEventListener('click', resetImageApp);
+        $('#img-cancel-btn').addEventListener('click', cancelImageJob);
 
         batchStartBtn.addEventListener('click', startBatch);
         batchZipBtn.addEventListener('click', downloadBatchZip);
@@ -212,9 +218,33 @@
         $('#img-output-resolution').textContent = `${w} x ${h}`;
     }
 
+    function cancelImageJob() {
+        if (!imgState.processing) return;
+        imgState.cancelRequested = true;
+        if (imgState.activeUpscaler) imgState.activeUpscaler.cancel();
+        if (imgState.taskId) {
+            fetch(`/api/image/cancel/${imgState.taskId}`, { method: 'POST' }).catch(() => {});
+        }
+    }
+
+    function onImageCancelled() {
+        imgState.processing = false;
+        imgState.activeUpscaler = null;
+        imgProgressSection.classList.add('hidden');
+        imgUpscaleBtn.disabled = false;
+        updateModeUI();
+        showToast('Cancelled — pick any mode and start again.');
+    }
+
+    function isCancelError(err) {
+        return imgState.cancelRequested || (err && err.message === 'cancelled');
+    }
+
     async function startImageUpscale() {
         if (imgState.processing || !imgState.file) return;
         imgState.processing = true;
+        imgState.cancelRequested = false;
+        imgState.taskId = null;
 
         imgUpscaleBtn.disabled = true;
         imgProgressSection.classList.remove('hidden');
@@ -241,6 +271,7 @@
             updateImgProgress({ progress: 0, message: 'Loading AI model...' }, startTime);
 
             const upscaler = new ProUpscaler();
+            imgState.activeUpscaler = upscaler;
             await upscaler.init(MODEL_PATH);
             const backend = upscaler.getBackend();
             updateImgProgress({ progress: 10, message: `Model loaded (${backend.toUpperCase()})` }, startTime);
@@ -257,8 +288,10 @@
             const resultUrl = URL.createObjectURL(blob);
 
             showSingleResult(resultUrl, blob, finalData.width, finalData.height, backend.toUpperCase());
+            imgState.activeUpscaler = null;
             upscaler.dispose();
         } catch (err) {
+            if (isCancelError(err)) { onImageCancelled(); return; }
             onImageUpscaleError('Quick upscale failed: ' + err.message);
         }
     }
@@ -269,6 +302,7 @@
             updateImgProgress({ progress: 0, message: 'Loading AI model...' }, startTime);
 
             const upscaler = new ProUpscaler();
+            imgState.activeUpscaler = upscaler;
             await upscaler.init(MODEL_PATH);
             const backend = upscaler.getBackend();
             updateImgProgress({ progress: 10, message: `Model loaded (${backend.toUpperCase()})` }, startTime);
@@ -285,8 +319,10 @@
             const resultUrl = URL.createObjectURL(blob);
 
             showSingleResult(resultUrl, blob, finalData.width, finalData.height, `${backend.toUpperCase()} Enhanced`);
+            imgState.activeUpscaler = null;
             upscaler.dispose();
         } catch (err) {
+            if (isCancelError(err)) { onImageCancelled(); return; }
             onImageUpscaleError('Enhance failed: ' + err.message);
         }
     }
@@ -322,7 +358,9 @@
                 throw new Error(err.error || 'Failed to start upscale');
             }
 
-            const statusData = await pollImageStatus(data.task_id, (s) => updateImgProgress(s, startTime));
+            const statusData = await pollImageStatus(data.task_id,
+                (s) => updateImgProgress(s, startTime),
+                () => imgState.cancelRequested);
 
             const imgUrl = `/api/image/download/${data.task_id}`;
             const outW = statusData.output_width || imgState.imageInfo.width * imgState.selectedScale;
@@ -330,18 +368,25 @@
 
             showSingleResult(imgUrl, null, outW, outH, serverMode === 'ai' ? 'Server AI' : 'FFmpeg');
         } catch (err) {
+            if (isCancelError(err)) { onImageCancelled(); return; }
             onImageUpscaleError('Upscale failed: ' + err.message);
         }
     }
 
-    function pollImageStatus(taskId, onProgress) {
+    function pollImageStatus(taskId, onProgress, isCancelled) {
         return new Promise((resolve, reject) => {
             const interval = setInterval(async () => {
+                if (isCancelled && isCancelled()) {
+                    clearInterval(interval);
+                    reject(new Error('cancelled'));
+                    return;
+                }
                 try {
                     const res = await fetch(`/api/image/status/${taskId}`);
                     const s = await res.json();
                     if (onProgress) onProgress({ progress: s.progress || 50, message: s.message || 'Processing...' });
                     if (s.status === 'completed') { clearInterval(interval); resolve(s); }
+                    else if (s.status === 'cancelled') { clearInterval(interval); reject(new Error('cancelled')); }
                     else if (s.status === 'error') { clearInterval(interval); reject(new Error(s.message || 'Server error')); }
                 } catch (e) {
                     clearInterval(interval);
@@ -546,6 +591,7 @@
         batchProgressLabel.textContent = '—';
         batchZipBtn.classList.add('hidden');
         batchStartBtn.disabled = false;
+        batchResetBtn.textContent = 'Cancel';
 
         batchGrid.innerHTML = '';
         batch.items.forEach((item) => {
@@ -578,8 +624,10 @@
     async function startBatch() {
         if (batch.running || !batch.items.length) return;
         batch.running = true;
+        batch.cancelRequested = false;
         batchStartBtn.disabled = true;
         batchZipBtn.classList.add('hidden');
+        batchResetBtn.textContent = 'Cancel';
 
         const mode = batchModeSel.value;
         const scale = batch.scale;
@@ -590,6 +638,7 @@
             if (isLocal) {
                 batchSub.textContent = 'Loading AI model...';
                 upscaler = new ProUpscaler();
+                batch.activeUpscaler = upscaler;
                 await upscaler.init(MODEL_PATH);
                 batchSub.textContent = `Running in your browser (${upscaler.getBackend().toUpperCase()})`;
             } else {
@@ -598,6 +647,7 @@
 
             let done = 0;
             for (const item of batch.items) {
+                if (batch.cancelRequested) break;
                 batchProgressLabel.textContent = `${done + 1} / ${batch.items.length}`;
                 setItemStatus(item, 'working', '0%');
                 try {
@@ -614,21 +664,34 @@
                     setItemStatus(item, 'done', 'done');
                     addItemDownloadLink(item);
                 } catch (e) {
+                    if (batch.cancelRequested || (e && e.message === 'cancelled')) {
+                        setItemStatus(item, 'failed', 'cancelled');
+                        break;
+                    }
                     console.error('batch item failed', e);
                     setItemStatus(item, 'failed', 'failed');
                 }
                 done++;
             }
 
-            batchProgressLabel.textContent = 'Complete';
-            batchSub.textContent = `${batch.items.filter(i => i.blob).length} of ${batch.items.length} succeeded`;
+            if (batch.cancelRequested) {
+                batchProgressLabel.textContent = 'Cancelled';
+                batchSub.textContent = `Cancelled — ${batch.items.filter(i => i.blob).length} finished before stopping`;
+            } else {
+                batchProgressLabel.textContent = 'Complete';
+                batchSub.textContent = `${batch.items.filter(i => i.blob).length} of ${batch.items.length} succeeded`;
+            }
             if (batch.items.some(i => i.blob)) batchZipBtn.classList.remove('hidden');
         } catch (err) {
             showToast('Batch failed: ' + err.message);
         } finally {
-            if (upscaler) upscaler.dispose();
+            if (upscaler && upscaler.worker) upscaler.dispose();
+            batch.activeUpscaler = null;
+            batch.currentTaskId = null;
+            batch.cancelRequested = false;
             batch.running = false;
             batchStartBtn.disabled = false;
+            batchResetBtn.textContent = 'Close';
         }
     }
 
@@ -638,6 +701,7 @@
         const res = await fetch('/api/image/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Upload failed');
+        batch.currentTaskId = data.task_id;
 
         const upRes = await fetch('/api/image/upscale', {
             method: 'POST',
@@ -649,7 +713,10 @@
             throw new Error(err.error || 'Failed to start');
         }
 
-        await pollImageStatus(data.task_id, (s) => onPct && onPct(s.progress || 0));
+        await pollImageStatus(data.task_id,
+            (s) => onPct && onPct(s.progress || 0),
+            () => batch.cancelRequested);
+        batch.currentTaskId = null;
 
         const dl = await fetch(`/api/image/download/${data.task_id}`);
         if (!dl.ok) throw new Error('Download failed');
@@ -701,7 +768,16 @@
     }
 
     function resetBatch() {
-        if (batch.running) return;
+        if (batch.running) {
+            // While running, this button acts as Cancel
+            batch.cancelRequested = true;
+            if (batch.activeUpscaler) batch.activeUpscaler.cancel();
+            if (batch.currentTaskId) {
+                fetch(`/api/image/cancel/${batch.currentTaskId}`, { method: 'POST' }).catch(() => {});
+            }
+            batchSub.textContent = 'Cancelling...';
+            return;
+        }
         resetBatchState();
         batchGrid.innerHTML = '';
         batchSection.classList.add('hidden');
