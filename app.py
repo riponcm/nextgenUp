@@ -589,35 +589,34 @@ def get_video_info(filepath):
 
 
 def get_image_info(filepath):
-    """Get image dimensions using ffmpeg (since ffprobe may not be in PATH)."""
+    """Get image dimensions — Pillow first, ffmpeg output as fallback."""
+    width = height = None
     try:
-        # Use ffmpeg -i to get image info from stderr
-        cmd = [FFMPEG, '-i', filepath, '-f', 'null', '-']
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        stderr = result.stderr
-
-        # Parse resolution from ffmpeg output like "64x64"
-        match = re.search(r'(\d{2,5})x(\d{2,5})', stderr)
-        if not match:
-            return None
-
-        width = int(match.group(1))
-        height = int(match.group(2))
-
-        # Detect format from extension
-        ext = Path(filepath).suffix.lower().lstrip('.')
-        fmt = ext.upper()
-        if fmt in ('JPG',):
-            fmt = 'JPEG'
-
-        return {
-            'width': width,
-            'height': height,
-            'format': fmt,
-            'size': os.path.getsize(filepath),
-        }
+        from PIL import Image as _Image
+        with _Image.open(filepath) as im:
+            width, height = im.size
     except Exception:
+        try:
+            cmd = [FFMPEG, '-i', filepath, '-f', 'null', '-']
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            match = re.search(r'(\d{2,5})x(\d{2,5})', result.stderr)
+            if match:
+                width, height = int(match.group(1)), int(match.group(2))
+        except Exception:
+            pass
+
+    if not width or not height:
         return None
+
+    ext = Path(filepath).suffix.lower().lstrip('.')
+    fmt = 'JPEG' if ext == 'jpg' else ext.upper()
+
+    return {
+        'width': width,
+        'height': height,
+        'format': fmt,
+        'size': os.path.getsize(filepath),
+    }
 
 
 def _run_image_upscale(task_id, scale):
