@@ -64,7 +64,35 @@
     <div class="about-overlay hidden" id="about-overlay">
         <div class="about-modal">
             <button class="about-close" id="about-close" aria-label="Close">&times;</button>
-            <img src="/static/icon_128.png" width="72" height="72" alt="NextGenUp logo">
+            <svg width="72" height="72" viewBox="0 0 130 130" fill="none" style="border-radius:16px">
+                <defs><linearGradient id="about-grad" x1="0" y1="0" x2="130" y2="130" gradientUnits="userSpaceOnUse"><stop stop-color="#6c5ce7"/><stop offset="1" stop-color="#a29bfe"/></linearGradient></defs>
+                <rect width="130" height="130" rx="29" fill="url(#about-grad)"/>
+                <rect x="20" y="34" width="12" height="12" fill="#fff" opacity="0.6"/>
+                <rect x="45" y="38" width="10" height="10" fill="#fff" opacity="0.55"/>
+                <rect x="55" y="38" width="10" height="10" fill="#fff" opacity="0.75"/>
+                <rect x="37" y="48" width="9" height="10" fill="#fff" opacity="0.65"/>
+                <rect x="45" y="48" width="10" height="10" fill="#fff" opacity="0.85"/>
+                <rect x="55" y="48" width="10" height="10" fill="#fff" opacity="0.95"/>
+                <rect x="37" y="58" width="9" height="10" fill="#fff" opacity="0.75"/>
+                <rect x="45" y="58" width="10" height="10" fill="#6c5ce7" opacity="0.9"/>
+                <rect x="55" y="58" width="10" height="10" fill="#fff" opacity="0.9"/>
+                <rect x="37" y="68" width="9" height="10" fill="#fff" opacity="0.8"/>
+                <rect x="45" y="68" width="10" height="10" fill="#fff" opacity="0.7"/>
+                <rect x="55" y="68" width="10" height="10" fill="#6c5ce7" opacity="0.85"/>
+                <rect x="41" y="78" width="7" height="9" fill="#fff" opacity="0.55"/>
+                <rect x="48" y="78" width="8" height="9" fill="#fff" opacity="0.8"/>
+                <rect x="56" y="78" width="9" height="9" fill="#fff" opacity="0.7"/>
+                <rect x="50" y="87" width="7" height="7" fill="#fff" opacity="0.45"/>
+                <rect x="57" y="87" width="8" height="7" fill="#fff" opacity="0.6"/>
+                <path d="M65 38A28 28 0 0 1 93 66Q93 82 80 89L65 94Z" fill="#fff"/>
+                <path d="M76 40L98 30Q102 44 96 54Q88 52 80 46Z" fill="#fff"/>
+                <circle cx="79" cy="63" r="8.5" fill="#a29bfe"/>
+                <circle cx="79" cy="63" r="4.5" fill="#2d2640"/>
+                <path d="M65 74H70Q75 75 72 81Q69 85 65 86Z" fill="#2d2640"/>
+                <rect x="63" y="16" width="4" height="86" rx="2" fill="#fff"/>
+                <circle cx="65" cy="106" r="9" fill="#fff"/>
+                <circle cx="65" cy="106" r="4" fill="#6c5ce7"/>
+            </svg>
             <h2>NextGen<span class="about-up">Up</span></h2>
             <p class="about-version">Version <span id="about-version">1.0.0</span></p>
             <p class="about-tagline">AI image &amp; video upscaling — free, open source, on your machine.</p>
@@ -74,7 +102,12 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                     Star on GitHub
                 </a>
+                <button class="about-github" id="update-check-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                    Check for Updates
+                </button>
             </div>
+            <p class="update-status hidden" id="update-status"></p>
             <p class="about-credits">
                 Powered by <a href="https://github.com/xinntao/Real-ESRGAN" class="ext-link">Real-ESRGAN</a>,
                 <a href="https://github.com/TencentARC/GFPGAN" class="ext-link">GFPGAN</a>
@@ -104,7 +137,11 @@
                 </button>
             </nav>
             <div class="sidebar-footer">
-                <span class="sidebar-version">v1.0</span>
+                <a href="https://github.com/riponcm/nextgenUp" class="sidebar-star ext-link" title="Star NextGenUp on GitHub">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                    Star the repo
+                </a>
+                <span class="sidebar-version" id="sidebar-version">v1.0.0</span>
             </div>
         </aside>
 
@@ -559,7 +596,7 @@
     </div><!-- /app-layout -->
 
     <footer>
-        <p>Upscale4K &mdash; Open source AI image & video upscaling. Quick uses Real-ESRGAN via WebGPU. Basic uses FFmpeg server-side. Pro uses AI in your browser.</p>
+        <p>NextGenUp &mdash; Open source AI image &amp; video upscaling. A <a href="https://matily.org" class="ext-link footer-link">matily.org</a> product.</p>
     </footer>
 
     <!-- Hidden canvas for Pro mode frame extraction -->

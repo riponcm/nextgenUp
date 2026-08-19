@@ -157,6 +157,24 @@ header {
     border-top: 1px solid var(--border);
 }
 
+.sidebar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.sidebar-star {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--orange);
+    text-decoration: none;
+}
+
+.sidebar-star:hover { text-decoration: underline; }
+
 .sidebar-version {
     font-size: 11px;
     color: var(--text-dim);
@@ -1052,6 +1070,24 @@ footer {
 }
 
 .about-github:hover { border-color: var(--accent); box-shadow: 0 0 14px var(--accent-glow); }
+
+.about-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+.about-github { cursor: pointer; font-family: inherit; }
+
+.update-status {
+    font-size: 12px;
+    margin: -6px 0 14px;
+    color: var(--text-muted);
+}
+
+.update-status.update-ok { color: var(--green); }
+.update-status.update-new { color: var(--teal); }
+.update-status.update-err { color: var(--orange); }
+.update-status a { color: var(--teal); font-weight: 600; }
+
+.footer-link { color: var(--teal); text-decoration: none; }
+.footer-link:hover { text-decoration: underline; }
 
 .about-credits { font-size: 11px; color: var(--text-dim); line-height: 1.6; }
 

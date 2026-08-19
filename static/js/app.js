@@ -79,36 +79,75 @@
         showProWarning('WebGPU not supported in this browser. Use Chrome 113+.');
     }
 
+    // External links: normal browsers open a tab; the desktop webview
+    // blocks window.open, so fall back to asking the local server to
+    // open the system browser.
+    function openExternal(url) {
+        const w = window.open(url, '_blank', 'noopener');
+        if (!w) {
+            fetch('/api/open', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url }),
+            }).catch(() => {});
+        }
+    }
+
     // --- About dialog ---
     function initAbout() {
         const overlay = $('#about-overlay');
-        $('#about-btn').addEventListener('click', async () => {
-            overlay.classList.remove('hidden');
-            try {
-                const caps = await (await fetch('/api/capabilities')).json();
-                if (caps.version) $('#about-version').textContent = caps.version;
-            } catch { /* keep default */ }
-        });
+        $('#about-btn').addEventListener('click', () => overlay.classList.remove('hidden'));
         $('#about-close').addEventListener('click', () => overlay.classList.add('hidden'));
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) overlay.classList.add('hidden');
         });
 
-        // External links: normal browsers open a tab; the desktop webview
-        // blocks window.open, so fall back to asking the local server to
-        // open the system browser.
         document.querySelectorAll('a.ext-link').forEach((a) => {
             a.addEventListener('click', (e) => {
                 e.preventDefault();
-                const w = window.open(a.href, '_blank', 'noopener');
-                if (!w) {
-                    fetch('/api/open', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url: a.href }),
-                    }).catch(() => {});
-                }
+                openExternal(a.href);
             });
+        });
+
+        // Fill version everywhere it's shown
+        fetch('/api/capabilities')
+            .then((r) => r.json())
+            .then((caps) => {
+                if (!caps.version) return;
+                $('#about-version').textContent = caps.version;
+                const sv = $('#sidebar-version');
+                if (sv) sv.textContent = 'v' + caps.version;
+            })
+            .catch(() => {});
+
+        // Live update check against GitHub releases
+        const updBtn = $('#update-check-btn');
+        const updStatus = $('#update-status');
+        updBtn.addEventListener('click', async () => {
+            updStatus.classList.remove('hidden');
+            updStatus.textContent = 'Checking for updates...';
+            updStatus.className = 'update-status';
+            try {
+                const res = await fetch('/api/update-check');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'check failed');
+                if (data.update_available) {
+                    updStatus.textContent = '';
+                    updStatus.className = 'update-status update-new';
+                    const link = document.createElement('a');
+                    link.href = data.url;
+                    link.textContent = 'Download';
+                    link.addEventListener('click', (e) => { e.preventDefault(); openExternal(data.url); });
+                    updStatus.append(`Version ${data.latest} is available! `, link);
+                    updStatus.append(' — the desktop app also offers this update on launch.');
+                } else {
+                    updStatus.textContent = `You're on the latest version (${data.current}).`;
+                    updStatus.className = 'update-status update-ok';
+                }
+            } catch {
+                updStatus.textContent = 'Could not check for updates — are you online?';
+                updStatus.className = 'update-status update-err';
+            }
         });
     }
 

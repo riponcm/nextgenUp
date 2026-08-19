@@ -33,6 +33,10 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": true,
+    "publisher": "matily.org",
+    "copyright": "© 2026 matily.org · MIT License",
+    "shortDescription": "AI image & video upscaling",
+    "longDescription": "NextGenUp — open source AI image & video upscaling. A matily.org product.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -5,3 +5,4 @@ pillow>=10.0
 numpy>=1.26
 # Face restoration (optional; also needs the GFPGAN model — see setup.sh)
 # opencv-python-headless>=4.10
+certifi>=2024.0

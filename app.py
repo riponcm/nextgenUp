@@ -193,6 +193,50 @@ def open_external():
     return jsonify({'status': 'ok'})
 
 
+@app.route('/api/update-check')
+def update_check():
+    """Compare the running version against the newest GitHub release."""
+    import ssl
+    import urllib.request
+    try:
+        ctx = None
+        try:
+            import certifi
+            ctx = ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            pass
+        req = urllib.request.Request(
+            'https://api.github.com/repos/riponcm/nextgenUp/releases/latest',
+            headers={'Accept': 'application/vnd.github+json',
+                     'User-Agent': f'NextGenUp/{VERSION}'})
+        try:
+            with urllib.request.urlopen(req, timeout=6, context=ctx) as resp:
+                release = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            if e.code == 404:  # no releases published yet
+                return jsonify({'current': VERSION, 'latest': VERSION,
+                                'update_available': False,
+                                'url': 'https://github.com/riponcm/nextgenUp/releases'})
+            raise
+        latest = release.get('tag_name', '').lstrip('v')
+        if not latest:
+            return jsonify({'error': 'No release found'}), 502
+
+        def ver(v):
+            nums = re.findall(r'\d+', v)[:3]
+            return tuple(int(n) for n in nums) if nums else (0,)
+
+        return jsonify({
+            'current': VERSION,
+            'latest': latest,
+            'update_available': ver(latest) > ver(VERSION),
+            'url': release.get('html_url',
+                               'https://github.com/riponcm/nextgenUp/releases/latest'),
+        })
+    except Exception:
+        return jsonify({'error': 'Could not reach GitHub'}), 502
+
+
 @app.route('/api/upload', methods=['POST'])
 def upload():
     file = request.files.get('video')
