@@ -158,7 +158,7 @@ NextGenUp stands on excellent open work:
 - [Tauri](https://tauri.app) — desktop shell
 - [Flask](https://flask.palletsprojects.com) — local server
 
-Built and maintained by [Matily](https://matily.org), with [projectmem](https://github.com/riponcm/projectmem) providing persistent project memory during development. Claude is a co-contributor to this codebase.
+Built and maintained by [Matily](https://matily.org), with [projectmem](https://github.com/riponcm/projectmem) providing persistent project memory during development.
 
 ## License
 
