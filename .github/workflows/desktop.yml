@@ -15,7 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-13
+          # macos-13 (Intel) runners are retired; macos-15-intel is
+          # GitHub's supported Intel label
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             ffarch: amd64
           - os: macos-14
