@@ -5,6 +5,10 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# tauri-action needs to create the release and upload assets
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
