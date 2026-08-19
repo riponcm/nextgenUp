@@ -45,6 +45,21 @@ Every installer is fully self-contained — the AI engine, FFmpeg, and the upsca
 
 macOS note: builds are not notarized with Apple; on first launch, right-click the app and choose Open.
 
+## Screenshots
+
+<p align="center">
+  <img src="assets/screens/compare.png" alt="Before/after comparison slider — pixelated original on the left, AI-upscaled result on the right" width="860">
+</p>
+
+<p align="center">
+  <img src="assets/screens/modes.png" alt="Image upscaling modes: Quick, Quality, Enhance, and Ultra with face restoration" width="425">
+  <img src="assets/screens/video.png" alt="Video upscaling to 4K with live progress and cancel" width="425">
+</p>
+
+<p align="center">
+  <img src="assets/screens/batch.png" alt="Batch processing multiple images with per-item progress" width="640">
+</p>
+
 ## Features
 
 | | |
