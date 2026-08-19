@@ -3,7 +3,14 @@ venv/
 __pycache__/
 *.pyc
 *.pyo
+
+# Secrets and credentials — never commit these
 .env
+.env.*
+*.key
+*.pem
+*.p12
+*.keystore
 
 # Uploads and outputs (user data)
 uploads/

@@ -1,101 +1,111 @@
-# NextGenUp
+<p align="center">
+  <img src="assets/hero.gif" alt="NextGenUp — free, open-source AI upscaling for images and video" width="900">
+</p>
 
-[![Release](https://img.shields.io/github/v/release/riponcm/nextgenUp?color=6c5ce7)](https://github.com/riponcm/nextgenUp/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/riponcm/nextgenUp/total?color=00cec9)](https://github.com/riponcm/nextgenUp/releases)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Desktop builds](https://github.com/riponcm/nextgenUp/actions/workflows/desktop.yml/badge.svg)](https://github.com/riponcm/nextgenUp/actions/workflows/desktop.yml)
+<p align="center">
+  <a href="https://github.com/riponcm/nextgenUp/releases/latest"><img src="https://img.shields.io/github/v/release/riponcm/nextgenUp?style=for-the-badge&color=6c5ce7&label=Release" alt="Latest release"></a>
+  <a href="https://github.com/riponcm/nextgenUp/releases"><img src="https://img.shields.io/github/downloads/riponcm/nextgenUp/total?style=for-the-badge&color=00cec9&label=Downloads" alt="Total downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-00b894?style=for-the-badge" alt="MIT license"></a>
+  <a href="https://github.com/riponcm/nextgenUp/actions/workflows/desktop.yml"><img src="https://img.shields.io/github/actions/workflow/status/riponcm/nextgenUp/desktop.yml?style=for-the-badge&label=Build" alt="Build status"></a>
+  <a href="https://github.com/riponcm/nextgenUp/stargazers"><img src="https://img.shields.io/github/stars/riponcm/nextgenUp?style=for-the-badge&color=fdcb6e&label=Stars" alt="GitHub stars"></a>
+</p>
 
-A [matily.org](https://matily.org) product.
+**NextGenUp** turns low-resolution photos and videos into crisp, high-resolution versions — up to 4K for video and 8K for images — using Real-ESRGAN AI models that run entirely on your own machine. No cloud, no subscription, no watermarks, no upload of your files to anyone's server.
 
-Open-source AI image & video upscaling that runs entirely on your own machine. Upload a low-res photo or video, get a crisp 4K version back — no cloud, no subscription, no watermarks.
+A [matily.org](https://matily.org) product. Free and open source under the MIT license.
 
-Runs as a **web app** (Flask, any browser on your network) or as a **native desktop app** (Tauri) for macOS (Intel + Apple Silicon), Windows x64, and Linux.
+---
 
-**Video upscaling** (Basic FFmpeg / Pro AI) &nbsp;•&nbsp; **Image upscaling** (Quick AI / Quality FFmpeg) &nbsp;•&nbsp; **Image enhancement** (same size, crystal clear)
+## Download
+
+| Platform | File | Notes |
+|----------|------|-------|
+| macOS (Apple Silicon) | [Download .dmg](https://github.com/riponcm/nextgenUp/releases/latest) | M1/M2/M3/M4 Macs |
+| macOS (Intel) | [Download .dmg](https://github.com/riponcm/nextgenUp/releases/latest) | x64 build |
+| Windows 10/11 (x64) | [Download installer](https://github.com/riponcm/nextgenUp/releases/latest) | NSIS `.exe` or `.msi` |
+| Linux (x64) | [Download .AppImage / .deb](https://github.com/riponcm/nextgenUp/releases/latest) | Most distributions |
+
+Every installer is fully self-contained — the AI engine, FFmpeg, and the upscaling models are bundled. Install, open, upscale. The app checks for updates on launch and installs them with one click (signed releases).
+
+macOS note: builds are not notarized with Apple; on first launch, right-click the app and choose Open.
 
 ## Features
 
-### Video Upscale
-| Mode | Engine | Runs on |
-|------|--------|---------|
-| **Basic** | FFmpeg Lanczos + CAS sharpening + unsharp | Server (CPU) |
-| **Pro** | Real-ESRGAN AI, frame by frame | Your browser GPU (WebGPU, WASM fallback) |
+| | |
+|---|---|
+| Image upscaling | Four modes — Quick (browser AI), Quality (FFmpeg), Enhance (same size, AI cleanup), Ultra (server AI, works from any device) |
+| Video upscaling | Basic (FFmpeg Lanczos + CAS sharpening) and Pro (Real-ESRGAN, frame by frame) |
+| Enhance mode | Keep the original resolution but reconstruct detail — noise, blur, and JPEG artifacts removed |
+| Face restoration | GFPGAN v1.4 — detected faces are aligned, restored, and seamlessly blended back |
+| Batch processing | Drop multiple images, process with any mode, download all as a zip |
+| Before/after slider | Drag a divider across the result to compare against the original |
+| Cancellable jobs | Every job can be cancelled mid-run; switch modes and restart instantly |
+| Portrait and landscape | Orientation handled automatically; output capped at 4K (video) / 8K (image) |
+| Auto-updates | Desktop app updates itself from GitHub releases (cryptographically signed) |
 
-### Image Upscale
-| Mode | Engine | Runs on |
-|------|--------|---------|
-| **Quick** | Real-ESRGAN AI (2x/4x) | Your browser GPU |
-| **Quality** | FFmpeg Lanczos + CAS (2x/4x, up to 8K) | Server |
-| **Enhance** | AI 4x upscale → downscale to original size | Your browser GPU |
-| **Ultra** | Real-ESRGAN AI via ONNX Runtime | Server (any device, no WebGPU needed) |
+## How to use
 
-**Enhance** is the mode for "keep my 500x500 photo 500x500, but make it crystal clear" — the AI reconstructs detail at 4x, then a high-quality downscale back to the original size removes noise, JPEG artifacts, and blur.
+1. Open NextGenUp and choose **Image Upscale** or **Video Upscale** in the sidebar.
+2. Drop a file onto the dropzone (or click to browse — select several images for batch mode).
+3. Pick a mode:
 
-**Ultra** runs the same AI on the server, so phones, tablets, and browsers without WebGPU on your network get full AI quality.
+   | Mode | Best for |
+   |------|----------|
+   | Quick | Fast AI upscaling in your browser or the app window |
+   | Quality | Sharp non-AI upscaling on the server, very fast |
+   | Enhance | Same-size cleanup — "keep it 500x500 but make it crystal clear" |
+   | Ultra | Highest-quality AI on the server; also the mode for phones and browsers without WebGPU |
 
-### Face Restoration (optional)
-GFPGAN v1.4 + YuNet face detection, running server-side through ONNX Runtime. Tick **Restore faces** in Ultra mode — every detected face is aligned, restored, and seamlessly blended back. Enable it by downloading the models via `setup.sh` (~340MB).
+4. Choose the scale factor (2x or 4x), then press **Start Upscaling**.
+5. Watch the live progress (cancel any time), compare the result with the before/after slider, and download.
 
-### Batch & Compare
-- **Batch mode** — drop multiple images at once, run any mode over the whole set, download everything as a zip
-- **Before/after slider** — drag a divider across the result to compare against the original
+For portraits, tick **Restore faces** in Ultra mode to run GFPGAN face restoration on every detected face.
 
-Other niceties:
-- Portrait, landscape, and square inputs handled automatically (longer side capped at 4K for video, 8K for images)
-- Live progress with ETA via Server-Sent Events
-- Audio preserved on video upscales
-- Encoder auto-detection: libx264 → h264_videotoolbox → libopenh264
-- Tasks persist in SQLite — completed results survive server restarts
-- Auto-cleanup deletes uploads/outputs older than 24h (`CLEANUP_HOURS` env var)
+## Run from source (web app)
 
-## Requirements
+The same interface also runs as a self-hosted web app that any device on your network can use.
 
-- **Python 3.10+**
-- **FFmpeg** (`brew install ffmpeg` on macOS, `apt install ffmpeg` on Linux)
-- A Chromium browser (Chrome/Edge 113+) for the AI modes — they use WebGPU, with automatic WASM fallback
-
-## Quick Start
+Requirements: Python 3.10–3.13 and FFmpeg (`brew install ffmpeg` / `apt install ffmpeg`).
 
 ```bash
 git clone https://github.com/riponcm/nextgenUp.git
 cd nextgenUp
-./setup.sh          # creates venv, installs deps, downloads the 5MB ONNX model
+./setup.sh
 source venv/bin/activate
 python app.py
 ```
 
-Open **http://localhost:5000**.
-
-To use it from other devices on your network, find your machine's IP and open `http://<your-ip>:5000`. Note: WebGPU (the browser AI modes) requires HTTPS or localhost — on a LAN IP either use the server-side modes, or add the URL to `chrome://flags` → "Insecure origins treated as secure".
+Open http://localhost:5000, or `http://<your-ip>:5000` from other devices. Browser AI modes need WebGPU (Chrome/Edge 113+) on secure origins; the Ultra mode works from any browser on any device.
 
 ## How it works
 
 ```
-Browser                              Flask server
-───────                              ────────────
-upload video/image  ──────────────►  ffprobe reads metadata
-                                     
-Basic/Quality mode  ──────────────►  FFmpeg: lanczos scale + CAS + unsharp
-   progress ◄── SSE ──────────────   
-                                     
-Pro/Quick/Enhance mode               
-   ONNX Runtime Web (WebGPU/WASM)    
-   Real-ESRGAN in a Web Worker       
-   tile-based inference (64–128px)   
-   frames POSTed back ────────────►  FFmpeg assembles + muxes audio
+Browser / app window                 Local server
+--------------------                 ------------
+upload image or video  ───────────►  Pillow / ffprobe read metadata
+
+Quality & Basic modes  ───────────►  FFmpeg: Lanczos scale + CAS + unsharp
+
+Quick / Enhance / Pro
+  ONNX Runtime Web (WebGPU/WASM)
+  Real-ESRGAN in a Web Worker
+  tile-based inference               Ultra mode
+  frames sent back      ───────────►  Real-ESRGAN via ONNX Runtime (CPU)
+                                      GFPGAN face restoration
+                                      FFmpeg assembles video + audio
 ```
 
-The AI model is [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) (`realesr-general-x4v3`, SRVGGNetCompact, ~5MB ONNX) running client-side via [ONNX Runtime Web](https://onnxruntime.ai/). Inference happens in a Web Worker so the UI never freezes; images are processed in overlapping tiles to fit GPU memory.
+The AI model is [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) (`realesr-general-x4v3`, ~5 MB ONNX). Images are processed in overlapping tiles so any resolution fits in memory; inference runs in a Web Worker (browser) or a background thread (server) so the interface never freezes. Completed tasks persist in SQLite, and files older than 24 hours are cleaned up automatically.
 
 ## Configuration
 
-| Env var | Default | Purpose |
-|---------|---------|---------|
+| Environment variable | Default | Purpose |
+|----------------------|---------|---------|
 | `PORT` | `5000` | Server port |
+| `CLEANUP_HOURS` | `24` | Files older than this are deleted |
 | `FLASK_DEBUG` | `0` | Set to `1` for the Werkzeug debugger (never on an exposed host) |
-| `CLEANUP_HOURS` | `24` | Files older than this are auto-deleted |
 
-Upload limit is 2GB (`MAX_CONTENT_LENGTH` in `app.py`).
+Upload limit is 2 GB. Face restoration requires the GFPGAN model (~340 MB): answer yes in `setup.sh`, or for the desktop app drop `GFPGANv1.4.onnx` into the app-data `models/` folder.
 
 ## Project layout
 
@@ -103,60 +113,53 @@ Upload limit is 2GB (`MAX_CONTENT_LENGTH` in `app.py`).
 app.py                     Flask server: upload, upscale, progress, download
 ai_engine.py               Server-side Real-ESRGAN (ONNX Runtime, tiled)
 face_restore.py            GFPGAN face restoration + YuNet detection
-templates/index.html       Dashboard (sidebar: Image Upscale / Video Upscale)
-static/css/style.css       Dark theme UI
-static/js/app.js           Video controller + tab navigation
-static/js/image-app.js     Image controller (modes, batch, compare slider)
-static/js/pro-upscaler.js  Web Worker wrapper
+paths.py                   Dev vs. packaged path resolution
+templates/index.html       Dashboard (Image Upscale / Video Upscale)
+static/js/app.js           Video controller, navigation, About dialog
+static/js/image-app.js     Image controller: modes, batch, compare slider
 static/js/pro-worker.js    ONNX inference worker (tiling, WebGPU/WASM)
-convert_model.py           Optional: convert official PyTorch weights to ONNX
-setup.sh                   One-command setup
+src-tauri/                 Desktop shell (Tauri 2): sidecar, auto-updater
+nextgenup-server.spec      PyInstaller build for the bundled server
+.github/workflows/         CI: signed installers for all platforms
 ```
 
-## Desktop app (Tauri)
+## Building and releasing the desktop app
 
-The desktop build wraps the same UI in a native window and bundles **everything**: the Python backend (compiled with PyInstaller — users never install Python), FFmpeg, and the Real-ESRGAN model. Install → double-click → done.
-
-**Releases are built by GitHub Actions** ([.github/workflows/desktop.yml](.github/workflows/desktop.yml)). Push a version tag and installers for all four targets appear on the release page:
+Releases are built by GitHub Actions. Bump the version in `src-tauri/tauri.conf.json` and `app.py`, then:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
-| Platform | Installer |
-|----------|-----------|
-| macOS Apple Silicon | `.dmg` |
-| macOS Intel | `.dmg` |
-| Windows x64 | NSIS `.exe` + `.msi` |
-| Linux x64 | `.AppImage` + `.deb` |
-
-You can also run **Actions → Desktop builds → Run workflow** for a test build without tagging (grab the artifacts from the run page).
-
-Local development build (needs Rust + Node):
-
-```bash
-pip install pyinstaller && pyinstaller nextgenup-server.spec
-mkdir -p src-tauri/binaries
-cp dist/nextgenup-server "src-tauri/binaries/nextgenup-server-$(rustc -vV | sed -n 's/host: //p')"
-cp "$(which ffmpeg)" "src-tauri/binaries/ffmpeg-$(rustc -vV | sed -n 's/host: //p')"
-cp "$(which ffprobe)" "src-tauri/binaries/ffprobe-$(rustc -vV | sed -n 's/host: //p')"
-npm install && npx tauri build
-```
-
-Desktop data lives in the OS app-data dir (e.g. `~/Library/Application Support/com.riponcm.nextgenup/` on macOS). To enable **face restoration** in the desktop app, drop `GFPGANv1.4.onnx` into the `models/` folder there — it's not bundled to keep installers small.
-
-Note: the CI bundles GPL FFmpeg builds; the app itself is MIT, FFmpeg keeps its own license.
+Installers for macOS (Intel and Apple Silicon), Windows x64, and Linux are compiled, signed for auto-update, and attached to the GitHub release automatically. Existing installations pick the update up on next launch.
 
 ## Roadmap
 
-- [x] Desktop app (Tauri) for macOS / Windows / Linux
-- [ ] Bigger server models (Real-ESRGAN x4plus / HAT) for a maximum-quality tier
-- [ ] Face restoration for video frames
-- [ ] WebCodecs-based video frame extraction (faster Pro mode)
-- [ ] In-app GFPGAN model download
-- [ ] Docker image
+- Larger server models (Real-ESRGAN x4plus, HAT) for a maximum-quality tier
+- Face restoration for video frames
+- WebCodecs-based frame extraction for faster Pro video
+- In-app GFPGAN model download
+- Docker image
+
+## Support the project
+
+If NextGenUp is useful to you, please [star the repository](https://github.com/riponcm/nextgenUp) — it is the simplest way to help other people discover a free alternative to paid upscalers. Sharing the project with anyone who works with old photos, AI-generated media, or low-resolution video helps just as much. Issues and pull requests are welcome.
+
+## Acknowledgements
+
+NextGenUp stands on excellent open work:
+
+- [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) (Xintao Wang et al.) — super-resolution models
+- [GFPGAN](https://github.com/TencentARC/GFPGAN) (Tencent ARC) — face restoration
+- [YuNet](https://github.com/opencv/opencv_zoo) (OpenCV Zoo) — face detection
+- [FFmpeg](https://ffmpeg.org) — video processing (bundled builds are GPL; FFmpeg keeps its own license)
+- [ONNX Runtime](https://onnxruntime.ai) — AI inference on server and in the browser
+- [Tauri](https://tauri.app) — desktop shell
+- [Flask](https://flask.palletsprojects.com) — local server
+
+Built and maintained by [Matily](https://matily.org). Developed with Claude Code, using projectmem for persistent project memory.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © 2026 Ripon Chandra Malo / matily.org
