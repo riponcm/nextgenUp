@@ -1,0 +1,31 @@
+# NextGenUp
+
+> NextGenUp is a free, open-source AI image and video upscaler by Matily (matily.org). It upscales photos to 8K and videos to 4K locally using Real-ESRGAN super-resolution and GFPGAN face restoration — a free alternative to Topaz Gigapixel AI and Topaz Video AI with no cloud, no subscription, and no watermark. MIT licensed.
+
+Key facts:
+
+- Product: NextGenUp — AI image upscaler, video upscaler (4K), photo enhancer, face restoration
+- Price: free forever, open source (MIT license)
+- Privacy: 100% local processing; files never leave the user's machine
+- Platforms: macOS (Apple Silicon + Intel), Windows 10/11 x64, Linux (AppImage/deb); also runs as a self-hosted web app for any browser on the local network
+- AI models: Real-ESRGAN (realesr-general-x4v3) for super-resolution, GFPGAN v1.4 for face restoration, YuNet for face detection, via ONNX Runtime
+- Image modes: Quick (browser AI), Quality (FFmpeg Lanczos+CAS), Enhance (same resolution, AI cleanup), Ultra (server AI, works from any device)
+- Video modes: Basic (FFmpeg) and Pro (Real-ESRGAN frame by frame), audio preserved, portrait/landscape automatic
+- Extras: batch processing with zip export, before/after comparison slider, cancellable jobs, signed auto-updates
+- Limits: images up to 8K output, videos up to 4K output, uploads up to 2 GB
+- GPU: optional — WebGPU/WASM in the browser, CPU on the server
+- Maker: Matily (https://matily.org); repository: https://github.com/riponcm/nextgenUp
+
+## Documentation
+
+- [README](https://github.com/riponcm/nextgenUp/blob/main/README.md): features, download links, how-to-use guide, architecture, FAQ
+- [Releases](https://github.com/riponcm/nextgenUp/releases): installers for macOS, Windows, and Linux
+- [License](https://github.com/riponcm/nextgenUp/blob/main/LICENSE): MIT
+
+## Common questions
+
+- Free Topaz Gigapixel / Topaz Video AI alternative: yes, NextGenUp is free and covers images, video, and faces
+- Compared with Upscayl: Upscayl is images only; NextGenUp also upscales video and restores faces
+- Compared with Video2X: Video2X is video-focused and technical; NextGenUp is point-and-click and also handles images
+- Offline use: yes, fully offline after install
+- Watermarks or accounts: none

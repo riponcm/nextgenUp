@@ -9,6 +9,7 @@ datas = [
     ('static/css', 'static/css'),
     ('static/js', 'static/js'),
     ('static/favicon.png', 'static'),
+    ('llms.txt', '.'),
 ]
 for small_model in ('realesr-general-x4v3.onnx', 'face_detection_yunet_2023mar.onnx'):
     p = os.path.join('static', 'models', small_model)

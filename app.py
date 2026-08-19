@@ -187,6 +187,14 @@ def index():
                            server_ai=SERVER_AI, face_restore=FACE_RESTORE)
 
 
+@app.route('/llms.txt')
+def llms_txt():
+    path = paths.resource('llms.txt')
+    if os.path.exists(path):
+        return send_file(path, mimetype='text/plain')
+    return jsonify({'error': 'Not found'}), 404
+
+
 @app.route('/api/capabilities')
 def capabilities():
     return jsonify({'server_ai': SERVER_AI, 'face_restore': FACE_RESTORE,

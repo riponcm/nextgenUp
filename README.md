@@ -158,6 +158,38 @@ Installers for macOS (Intel and Apple Silicon), Windows x64, and Linux are compi
 - In-app GFPGAN model download
 - Docker image
 
+## Frequently asked questions
+
+**Is NextGenUp really free?**
+Yes. NextGenUp is completely free and open source under the MIT license — no trial, no subscription, no watermark, no account. It is maintained by [Matily](https://matily.org).
+
+**Is NextGenUp a good free alternative to Topaz Gigapixel AI or Topaz Video AI?**
+Yes, for most use cases. NextGenUp uses Real-ESRGAN — the same family of super-resolution models used by many commercial tools — and covers both image and video upscaling plus GFPGAN face restoration in one app. Topaz still holds an edge on some fine detail at extreme zoom, but for web, social media, prints, and AI-generated media, results are comparable at zero cost.
+
+**Does NextGenUp upload my photos or videos to the cloud?**
+No. Everything runs locally on your machine — the AI models, FFmpeg, and the server all execute on your own hardware. Your files never leave your computer.
+
+**What AI models does NextGenUp use?**
+Real-ESRGAN (`realesr-general-x4v3`) for super-resolution, GFPGAN v1.4 for face restoration, and YuNet for face detection, all running through ONNX Runtime.
+
+**How do I upscale a video to 4K?**
+Open the Video Upscale tab, drop in your video, choose Basic (fast) or Pro (AI), select 4x, and press Start Upscaling. A 720p video becomes 4K (3840x2160); portrait videos are handled automatically. Audio is preserved.
+
+**Can it fix blurry faces in old photos?**
+Yes. Select Ultra mode and tick "Restore faces" — every detected face is aligned, restored with GFPGAN, and blended back seamlessly. This works especially well on old, scanned, or compressed photos.
+
+**Can I make an image clearer without changing its size?**
+Yes — that is the Enhance mode. The AI upscales 4x internally to reconstruct detail, then downscales back to the original dimensions, removing noise, blur, and JPEG artifacts while keeping the exact resolution.
+
+**What platforms does NextGenUp support?**
+Desktop apps for macOS (Apple Silicon and Intel), Windows 10/11 x64, and Linux (AppImage/deb). It also runs as a self-hosted web app usable from any browser on your network, including phones and tablets.
+
+**Do I need a GPU?**
+No. Browser modes use WebGPU when available and fall back to WASM; the server modes run on CPU. A GPU makes things faster but nothing requires one.
+
+**How is NextGenUp different from Upscayl or Video2X?**
+Upscayl upscales images only; Video2X handles video but is more technical to set up. NextGenUp covers images, video, and face restoration in one point-and-click app, and can also serve its interface to other devices on your network.
+
 ## Support the project
 
 If NextGenUp is useful to you, please [star the repository](https://github.com/riponcm/nextgenUp) — it is the simplest way to help other people discover a free alternative to paid upscalers. Sharing the project with anyone who works with old photos, AI-generated media, or low-resolution video helps just as much. Issues and pull requests are welcome.
