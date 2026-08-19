@@ -970,6 +970,107 @@ footer {
     flex-shrink: 0;
 }
 
+/* === About === */
+.header-right { display: flex; align-items: center; gap: 10px; }
+
+.about-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.about-btn:hover { color: var(--text); border-color: var(--border-hover); }
+
+.about-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 8, 13, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 400;
+}
+
+.about-modal {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 36px 44px 28px;
+    text-align: center;
+    max-width: 420px;
+}
+
+.about-modal img { border-radius: 16px; margin-bottom: 12px; }
+
+.about-modal h2 { font-size: 22px; letter-spacing: -0.5px; }
+
+.about-up {
+    background: linear-gradient(135deg, var(--accent), #a29bfe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.about-version { font-size: 12px; color: var(--text-dim); margin: 2px 0 10px; }
+
+.about-tagline { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
+
+.about-brand { font-size: 14px; margin-bottom: 16px; }
+
+.about-brand a {
+    color: var(--teal);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.about-brand a:hover { text-decoration: underline; }
+
+.about-actions { margin-bottom: 16px; }
+
+.about-github {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 20px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-hover);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all var(--transition);
+}
+
+.about-github:hover { border-color: var(--accent); box-shadow: 0 0 14px var(--accent-glow); }
+
+.about-credits { font-size: 11px; color: var(--text-dim); line-height: 1.6; }
+
+.about-credits a { color: var(--text-muted); }
+
+.about-close {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.about-close:hover { color: var(--text); }
+
 /* === Error Toast === */
 .toast {
     position: fixed;

@@ -17,6 +17,8 @@ from flask import Flask, Response, jsonify, render_template, request, send_file
 
 import paths
 
+VERSION = '1.0.0'
+
 try:
     import ai_engine
     SERVER_AI = ai_engine.available()
@@ -166,7 +168,29 @@ def index():
 
 @app.route('/api/capabilities')
 def capabilities():
-    return jsonify({'server_ai': SERVER_AI, 'face_restore': FACE_RESTORE})
+    return jsonify({'server_ai': SERVER_AI, 'face_restore': FACE_RESTORE,
+                    'version': VERSION})
+
+
+# Domains the About dialog may open in the system browser. The desktop
+# webview can't open external links itself, so it asks the local server.
+OPEN_ALLOWED = {'matily.org', 'www.matily.org', 'github.com'}
+
+
+@app.route('/api/open', methods=['POST'])
+def open_external():
+    from urllib.parse import urlparse
+    import webbrowser
+    url = (request.json or {}).get('url', '')
+    parsed = urlparse(url)
+    if parsed.scheme != 'https' or parsed.hostname not in OPEN_ALLOWED:
+        return jsonify({'error': 'URL not allowed'}), 400
+    # Only honor requests from this machine — remote LAN users have a real
+    # browser and don't need (or want) links opening on the server.
+    if request.remote_addr not in ('127.0.0.1', '::1'):
+        return jsonify({'error': 'Local requests only'}), 403
+    webbrowser.open(url)
+    return jsonify({'status': 'ok'})
 
 
 @app.route('/api/upload', methods=['POST'])

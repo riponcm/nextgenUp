@@ -43,29 +43,73 @@
     checkWebGPU();
     bindEvents();
     initSidebar();
+    initAbout();
 
     async function checkWebGPU() {
         const dot = gpuBadge.querySelector('.badge-dot');
-        if (!navigator.gpu) {
-            dot.classList.add('unavailable');
-            gpuStatus.textContent = 'WebGPU unavailable';
-            showProWarning('WebGPU not supported in this browser. Use Chrome 113+.');
+        let webgpu = false;
+        if (navigator.gpu) {
+            try {
+                webgpu = !!(await navigator.gpu.requestAdapter());
+            } catch { /* fall through */ }
+        }
+
+        if (webgpu) {
+            dot.classList.add('active');
+            gpuStatus.textContent = 'WebGPU ready';
             return;
         }
+
+        // No WebGPU (e.g. the desktop webview or an older browser). If the
+        // server has its own AI engine that's the better path anyway — show
+        // a healthy badge and default images to Ultra mode.
         try {
-            const adapter = await navigator.gpu.requestAdapter();
-            if (adapter) {
+            const caps = await (await fetch('/api/capabilities')).json();
+            if (caps.server_ai) {
                 dot.classList.add('active');
-                gpuStatus.textContent = 'WebGPU ready';
-            } else {
-                dot.classList.add('unavailable');
-                gpuStatus.textContent = 'No GPU adapter';
-                showProWarning('No WebGPU adapter found.');
+                gpuStatus.textContent = 'AI engine ready (server)';
+                document.querySelector('[data-imgmode="ultra"]')?.click();
+                showProWarning('No WebGPU — Pro runs on slower WASM. Basic mode recommended.');
+                return;
             }
-        } catch {
-            dot.classList.add('unavailable');
-            gpuStatus.textContent = 'WebGPU error';
-        }
+        } catch { /* server unreachable — fall through */ }
+
+        dot.classList.add('unavailable');
+        gpuStatus.textContent = 'WebGPU unavailable';
+        showProWarning('WebGPU not supported in this browser. Use Chrome 113+.');
+    }
+
+    // --- About dialog ---
+    function initAbout() {
+        const overlay = $('#about-overlay');
+        $('#about-btn').addEventListener('click', async () => {
+            overlay.classList.remove('hidden');
+            try {
+                const caps = await (await fetch('/api/capabilities')).json();
+                if (caps.version) $('#about-version').textContent = caps.version;
+            } catch { /* keep default */ }
+        });
+        $('#about-close').addEventListener('click', () => overlay.classList.add('hidden'));
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.classList.add('hidden');
+        });
+
+        // External links: normal browsers open a tab; the desktop webview
+        // blocks window.open, so fall back to asking the local server to
+        // open the system browser.
+        document.querySelectorAll('a.ext-link').forEach((a) => {
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                const w = window.open(a.href, '_blank', 'noopener');
+                if (!w) {
+                    fetch('/api/open', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: a.href }),
+                    }).catch(() => {});
+                }
+            });
+        });
     }
 
     function showProWarning(msg) {

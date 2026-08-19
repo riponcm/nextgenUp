@@ -5,6 +5,8 @@
 use std::process::{Child, Command};
 use std::sync::Mutex;
 use tauri::Manager;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_updater::UpdaterExt;
 
 const SERVER_PORT: u16 = 18790;
 
@@ -37,8 +39,48 @@ fn kill_server_tree(child: &mut Child) {
     let _ = child.wait();
 }
 
+// Check GitHub releases for a newer signed build; ask, install, restart.
+fn spawn_update_check(handle: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let updater = match handle.updater() {
+            Ok(u) => u,
+            Err(_) => return,
+        };
+        let update = match updater.check().await {
+            Ok(Some(u)) => u,
+            _ => return,
+        };
+
+        let msg = format!(
+            "NextGenUp {} is available (you have {}).\n\nDownload and install now?",
+            update.version, update.current_version
+        );
+        let install = handle
+            .dialog()
+            .message(msg)
+            .title("Update available")
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Install".to_string(),
+                "Later".to_string(),
+            ))
+            .blocking_show();
+
+        if install && update.download_and_install(|_, _| {}, || {}).await.is_ok() {
+            // Stop the sidecar before the app restarts into the new version
+            if let Some(state) = handle.try_state::<ServerChild>() {
+                if let Some(mut child) = state.0.lock().unwrap().take() {
+                    kill_server_tree(&mut child);
+                }
+            }
+            handle.restart();
+        }
+    });
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let exe_dir = std::env::current_exe()?
                 .parent()
@@ -79,6 +121,8 @@ fn main() {
                 // Dev fallback: assume `python app.py` is running separately.
                 eprintln!("server sidecar not found at {server:?}; expecting a dev server");
             }
+
+            spawn_update_check(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())

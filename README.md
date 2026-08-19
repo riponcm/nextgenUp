@@ -1,5 +1,12 @@
 # NextGenUp
 
+[![Release](https://img.shields.io/github/v/release/riponcm/nextgenUp?color=6c5ce7)](https://github.com/riponcm/nextgenUp/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/riponcm/nextgenUp/total?color=00cec9)](https://github.com/riponcm/nextgenUp/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Desktop builds](https://github.com/riponcm/nextgenUp/actions/workflows/desktop.yml/badge.svg)](https://github.com/riponcm/nextgenUp/actions/workflows/desktop.yml)
+
+A [matily.org](https://matily.org) product.
+
 Open-source AI image & video upscaling that runs entirely on your own machine. Upload a low-res photo or video, get a crisp 4K version back — no cloud, no subscription, no watermarks.
 
 Runs as a **web app** (Flask, any browser on your network) or as a **native desktop app** (Tauri) for macOS (Intel + Apple Silicon), Windows x64, and Linux.

@@ -6,6 +6,14 @@
   "build": {
     "frontendDist": "../desktop-ui"
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYwM0Q1RDAxNzg3RjlBMkIKUldRcm1uOTRBVjA5OEFFNHhRV3hkamhPdUhLdDJyeEF5bVNJWFJIeUxPTDU0T1VoYVQyaDhOZ2YK",
+      "endpoints": [
+        "https://github.com/riponcm/nextgenUp/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "app": {
     "windows": [
       {
@@ -24,6 +32,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
