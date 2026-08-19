@@ -18,6 +18,25 @@ fn server_binary_name() -> &'static str {
     }
 }
 
+// PyInstaller one-file binaries run as a bootloader that spawns the real
+// server as its own child, so killing only the direct child leaves an
+// orphan. Kill the whole tree: the process group on Unix, taskkill /T on
+// Windows.
+fn kill_server_tree(child: &mut Child) {
+    #[cfg(unix)]
+    unsafe {
+        libc::kill(-(child.id() as i32), libc::SIGTERM);
+    }
+    #[cfg(windows)]
+    {
+        let _ = Command::new("taskkill")
+            .args(["/PID", &child.id().to_string(), "/T", "/F"])
+            .output();
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -35,12 +54,22 @@ fn main() {
             std::fs::create_dir_all(data_dir.join("models")).ok();
 
             if server.exists() {
-                match Command::new(&server)
-                    .env("PORT", SERVER_PORT.to_string())
+                let mut cmd = Command::new(&server);
+                cmd.env("PORT", SERVER_PORT.to_string())
                     .env("NEXTGENUP_DATA", &data_dir)
-                    .current_dir(&data_dir)
-                    .spawn()
+                    .current_dir(&data_dir);
+                #[cfg(unix)]
                 {
+                    use std::os::unix::process::CommandExt;
+                    cmd.process_group(0);
+                }
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+                    cmd.creation_flags(CREATE_NO_WINDOW);
+                }
+                match cmd.spawn() {
                     Ok(child) => {
                         app.manage(ServerChild(Mutex::new(Some(child))));
                     }
@@ -58,7 +87,7 @@ fn main() {
             if let tauri::RunEvent::Exit = event {
                 if let Some(state) = app.try_state::<ServerChild>() {
                     if let Some(mut child) = state.0.lock().unwrap().take() {
-                        let _ = child.kill();
+                        kill_server_tree(&mut child);
                     }
                 }
             }
