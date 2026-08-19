@@ -52,6 +52,20 @@ def _find_bin(name):
 FFMPEG = _find_bin('ffmpeg')
 FFPROBE = _find_bin('ffprobe')
 
+
+def _bin_works(path):
+    try:
+        return subprocess.run([path, '-version'], capture_output=True,
+                              timeout=8).returncode == 0
+    except Exception:
+        return False
+
+
+FFMPEG_OK = _bin_works(FFMPEG)
+if not FFMPEG_OK:
+    print(f'[startup] WARNING: ffmpeg not working at {FFMPEG} — '
+          'video and Quality-mode features will be unavailable', flush=True)
+
 app = Flask(__name__,
             template_folder=paths.resource('templates'),
             static_folder=paths.resource('static'))
@@ -176,7 +190,7 @@ def index():
 @app.route('/api/capabilities')
 def capabilities():
     return jsonify({'server_ai': SERVER_AI, 'face_restore': FACE_RESTORE,
-                    'version': VERSION})
+                    'ffmpeg': FFMPEG_OK, 'version': VERSION})
 
 
 # Domains the About dialog may open in the system browser. The desktop
@@ -553,7 +567,46 @@ def _encoder_args(encoder):
         return ['-c:v', 'libopenh264', '-b:v', '20M', '-pix_fmt', 'yuv420p']
 
 
+def _video_info_via_ffmpeg(filepath):
+    """Fallback: parse `ffmpeg -i` stderr when ffprobe is unavailable."""
+    try:
+        result = subprocess.run([FFMPEG, '-hide_banner', '-i', filepath],
+                                capture_output=True, text=True, timeout=20)
+        err = result.stderr
+
+        video_line = next((l for l in err.splitlines() if 'Video:' in l), None)
+        if not video_line:
+            return None
+        res = re.search(r'(\d{2,5})x(\d{2,5})', video_line)
+        if not res:
+            return None
+        codec = re.search(r'Video:\s*(\w+)', video_line)
+        fps = re.search(r'([\d.]+)\s*fps', video_line)
+        dur = re.search(r'Duration:\s*(\d+):(\d+):([\d.]+)', err)
+        duration = 0.0
+        if dur:
+            duration = int(dur.group(1)) * 3600 + int(dur.group(2)) * 60 + float(dur.group(3))
+
+        return {
+            'width': int(res.group(1)),
+            'height': int(res.group(2)),
+            'duration': round(duration, 2),
+            'fps': round(float(fps.group(1)), 2) if fps else 24,
+            'codec': codec.group(1) if codec else 'unknown',
+            'size': os.path.getsize(filepath),
+        }
+    except Exception:
+        return None
+
+
 def get_video_info(filepath):
+    info = _video_info_via_ffprobe(filepath)
+    if info is None:
+        info = _video_info_via_ffmpeg(filepath)
+    return info
+
+
+def _video_info_via_ffprobe(filepath):
     try:
         cmd = [
             FFPROBE, '-v', 'quiet', '-print_format', 'json',

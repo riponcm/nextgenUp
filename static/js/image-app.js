@@ -174,6 +174,7 @@
 
         imgUploadSection.classList.add('hidden');
         imgAppSection.classList.remove('hidden');
+        imgNewRow.classList.remove('hidden');
         imgUpscaleBtn.disabled = false;
     }
 
@@ -231,6 +232,7 @@
         imgState.processing = false;
         imgState.activeUpscaler = null;
         imgProgressSection.classList.add('hidden');
+        imgNewRow.classList.remove('hidden');
         imgUpscaleBtn.disabled = false;
         updateModeUI();
         showToast('Cancelled — pick any mode and start again.');
@@ -436,6 +438,7 @@
     function onImageUpscaleError(msg) {
         imgState.processing = false;
         imgProgressSection.classList.add('hidden');
+        imgNewRow.classList.remove('hidden');
         imgUpscaleBtn.disabled = false;
         updateModeUI();
         showToast('Error: ' + msg);

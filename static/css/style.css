@@ -425,6 +425,7 @@ header {
     cursor: pointer;
     transition: all var(--transition);
     display: flex;
+    flex-wrap: wrap;
     gap: 16px;
     align-items: flex-start;
     position: relative;
@@ -523,14 +524,11 @@ header {
 .tag-gpu { background: rgba(253, 203, 110, 0.1); color: var(--orange); }
 
 .pro-warning {
-    position: absolute;
-    bottom: 8px;
-    left: 20px;
-    right: 20px;
+    flex-basis: 100%;
     font-size: 11px;
     color: var(--orange);
     background: rgba(253, 203, 110, 0.08);
-    padding: 4px 8px;
+    padding: 5px 10px;
     border-radius: 6px;
     text-align: center;
 }

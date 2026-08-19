@@ -111,10 +111,13 @@
             });
         });
 
-        // Fill version everywhere it's shown
+        // Fill version everywhere it's shown; warn early if FFmpeg is broken
         fetch('/api/capabilities')
             .then((r) => r.json())
             .then((caps) => {
+                if (caps.ffmpeg === false) {
+                    showToast('FFmpeg is not available — video upscaling and Quality mode will not work.');
+                }
                 if (!caps.version) return;
                 $('#about-version').textContent = caps.version;
                 const sv = $('#sidebar-version');
@@ -248,10 +251,11 @@
 
             upscaleBtn.disabled = false;
             upscaleBtn.innerHTML = upscaleIconSVG() + ' Start Upscaling';
+            newVideoRow.classList.remove('hidden');
         } catch (err) {
+            // Don't strand the user on a broken state — back to the dropzone
             showToast('Upload failed: ' + err.message);
-            upscaleBtn.disabled = false;
-            upscaleBtn.innerHTML = upscaleIconSVG() + ' Start Upscaling';
+            resetApp();
         }
     }
 
@@ -292,6 +296,7 @@
         state.processing = false;
         state.activeUpscaler = null;
         progressSection.classList.add('hidden');
+        newVideoRow.classList.remove('hidden');
         upscaleBtn.disabled = false;
         upscaleBtn.innerHTML = upscaleIconSVG() + ' Start Upscaling';
         showToast('Cancelled — pick any mode and start again.');
@@ -522,6 +527,7 @@
     function onUpscaleError(msg) {
         state.processing = false;
         progressSection.classList.add('hidden');
+        newVideoRow.classList.remove('hidden');
         upscaleBtn.disabled = false;
         upscaleBtn.innerHTML = upscaleIconSVG() + ' Start Upscaling';
         showToast('Error: ' + msg);
