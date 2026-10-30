@@ -24,7 +24,9 @@ jobs:
             target: x86_64-apple-darwin
             ffarch: amd64
             extra: --config src-tauri/release-signing-macos.json
-          - os: macos-14
+          # macos-14 is being retired (brownouts from Oct 2026); macos-15 is
+          # also Apple Silicon
+          - os: macos-15
             target: aarch64-apple-darwin
             ffarch: arm64
             extra: --config src-tauri/release-signing-macos.json
