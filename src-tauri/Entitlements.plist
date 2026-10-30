@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Notarization requires the hardened runtime. The local engine is a
+         PyInstaller program that unpacks its own Python libraries to a
+         temporary folder at start and loads them. Without these two
+         entitlements the hardened runtime refuses those libraries (signed
+         by a different team) and the engine never starts, which is the
+         failure users saw in 1.2.1 (issue #10). -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+</dict>
+</plist>

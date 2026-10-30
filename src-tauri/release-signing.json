@@ -1,0 +1,7 @@
+{
+  "bundle": {
+    "windows": {
+      "signCommand": "trusted-signing-cli -e https://eus.codesigning.azure.net -a matily-signing -c matily-public -d NextGenUp %1"
+    }
+  }
+}
