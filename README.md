@@ -45,16 +45,16 @@ Excellent tools all around — NextGenUp's niche is covering **images, audio, vi
 
 | Your computer | Download | Notes |
 |---|---|---|
-| **Windows** 10 / 11 | [NextGenUp-Windows-Setup.exe](https://github.com/riponcm/nextgenUp/releases/latest/download/NextGenUp-Windows-Setup.exe) | Most users. SmartScreen may ask once: click **More info**, then **Run anyway** |
+| **Windows** 10 / 11 | [NextGenUp-Windows-Setup.exe](https://github.com/riponcm/nextgenUp/releases/latest/download/NextGenUp-Windows-Setup.exe) | Most users. Signed with a verified publisher. SmartScreen can still show a notice for a while, until downloads build its trust |
 | **Mac** with Apple Silicon (M1, M2, M3, M4) | [NextGenUp-Mac-AppleSilicon.dmg](https://github.com/riponcm/nextgenUp/releases/latest/download/NextGenUp-Mac-AppleSilicon.dmg) | Macs from 2020 onward. Not sure? Apple menu > About This Mac > "Chip" |
 | **Mac** with Intel | [NextGenUp-Mac-Intel.dmg](https://github.com/riponcm/nextgenUp/releases/latest/download/NextGenUp-Mac-Intel.dmg) | Macs from 2019 and earlier |
 | **Linux** | [NextGenUp-Linux.AppImage](https://github.com/riponcm/nextgenUp/releases/latest/download/NextGenUp-Linux.AppImage) | Any distribution. `chmod +x` then run. An RPM is also on the release page |
 
 Every installer is fully self-contained — the AI engine, FFmpeg, and the upscaling models are bundled. Install, open, upscale. The app checks for updates on launch and installs them with one click (signed releases).
 
-macOS note: builds are not notarized with Apple, so the first launch needs one approval. Open the app once, then go to **System Settings > Privacy & Security** and click **Open Anyway**.
+Releases are code signed. The Windows installers are signed with Azure Artifact Signing, and the Mac apps are signed with a Developer ID and notarized by Apple. The first time you open the Mac app, macOS asks "Are you sure you want to open it?" for any app downloaded from the Internet. Click **Open**.
 
-Two older versions need a one-time Terminal fix on Apple Silicon Macs. Version 1.2.2 and newer need neither.
+Older Mac versions need a one-time Terminal fix on Apple Silicon. Version 1.3.0 and newer need neither.
 
 - **"NextGenUp is damaged and can't be opened"** (version 1.2.0 or earlier): the download is fine, those builds had an incomplete signature. Move the app to Applications, then run this once:
 
@@ -259,14 +259,16 @@ nextgenup-server.spec      PyInstaller build for the bundled server
 
 ## Building and releasing the desktop app
 
-Releases are built by GitHub Actions. Bump the version in `src-tauri/tauri.conf.json` and `app.py`, then:
+Releases are built by GitHub Actions. Bump the version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `app.py`, then:
 
 ```bash
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.3.0
+git push origin v1.3.0
 ```
 
-Installers for macOS (Intel and Apple Silicon), Windows x64, and Linux are compiled, signed for auto-update, and attached to the GitHub release automatically. Existing installations pick the update up on next launch.
+Installers for macOS (Intel and Apple Silicon), Windows x64, and Linux are compiled, code signed, signed for auto-update, and attached to the GitHub release automatically. A final step renames the installers to OS-friendly names and moves the auto-update packages to a separate `updater-packages` release. Existing installations pick the update up on next launch.
+
+Code signing uses repository secrets: `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` (Developer ID signing and notarization), `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` (Azure Artifact Signing for Windows), and `TAURI_SIGNING_PRIVATE_KEY` (auto-update signatures). Without the Apple secrets the Mac build is not notarized. Local builds stay unsigned.
 
 ## Roadmap
 
