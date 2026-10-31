@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="228" height="60" viewBox="0 0 228 60" role="img" aria-label="DOWNLOAD FOR Mac Apple Silicon · M1–M4 · DMG">
+  <title>DOWNLOAD FOR Mac Apple Silicon · M1–M4 · DMG</title>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4b5563"/><stop offset="1" stop-color="#1f2937"/></linearGradient></defs>
+  <rect x="0.5" y="0.5" width="227" height="59" rx="12" fill="url(#g)" stroke="#ffffff" stroke-opacity="0.18"/>
+  <g transform="translate(16 14)" fill="#fff"><rect x="6" y="3" width="20" height="20" rx="4" fill="none" stroke="#fff" stroke-width="2.4"/><rect x="11.5" y="8.5" width="9" height="9" rx="1.5"/><path d="M11 0v3M16 0v3M21 0v3M11 23v3M16 23v3M21 23v3M3 8h3M3 13h3M3 18h3M26 8h3M26 13h3M26 18h3" stroke="#fff" stroke-width="2" stroke-linecap="round" transform="translate(0 1)"/></g>
+  <text x="62" y="23" fill="#fff" fill-opacity="0.78" font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="10.5" font-weight="600" letter-spacing="0.8">DOWNLOAD FOR</text>
+  <text x="62" y="39" fill="#fff" font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Mac</text>
+  <text x="62" y="52" fill="#fff" fill-opacity="0.78" font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="10">Apple Silicon · M1–M4 · DMG</text>
+</svg>

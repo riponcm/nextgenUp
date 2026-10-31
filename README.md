@@ -14,6 +14,15 @@
 
 A [matily.org](https://matily.org) product. Free and open source under the MIT license.
 
+<p align="center">
+  <a href="https://github.com/riponcm/nextgenUp/releases/latest/download/NextGenUp-Windows-Setup.exe"><img src="assets/buttons/get-windows.svg" alt="Download NextGenUp for Windows x64 (EXE installer)" width="200" height="53" /></a>
+  <a href="https://github.com/riponcm/nextgenUp/releases/latest/download/NextGenUp-Mac-AppleSilicon.dmg"><img src="assets/buttons/get-mac-apple-silicon.svg" alt="Download NextGenUp for Mac with Apple Silicon (DMG)" width="200" height="53" /></a>
+  <a href="https://github.com/riponcm/nextgenUp/releases/latest/download/NextGenUp-Mac-Intel.dmg"><img src="assets/buttons/get-mac-intel.svg" alt="Download NextGenUp for Mac with Intel (DMG)" width="200" height="53" /></a>
+  <a href="https://github.com/riponcm/nextgenUp/releases/latest/download/NextGenUp-Linux.AppImage"><img src="assets/buttons/get-linux.svg" alt="Download NextGenUp for Linux x64 (AppImage)" width="200" height="53" /></a>
+</p>
+
+<p align="center"><sub>Free, no account, no watermark · Not sure which Mac? Apple menu → About This Mac · <a href="https://github.com/riponcm/nextgenUp/releases/latest">Release notes</a> · <a href="#download">Install notes</a></sub></p>
+
 ## Why NextGenUp
 
 | | NextGenUp | Topaz Photo / Video AI | remove.bg | Upscayl | Video2X |

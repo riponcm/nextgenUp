@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="228" height="60" viewBox="0 0 228 60" role="img" aria-label="DOWNLOAD FOR Mac Intel · DMG">
+  <title>DOWNLOAD FOR Mac Intel · DMG</title>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4b5563"/><stop offset="1" stop-color="#1f2937"/></linearGradient></defs>
+  <rect x="0.5" y="0.5" width="227" height="59" rx="12" fill="url(#g)" stroke="#ffffff" stroke-opacity="0.18"/>
+  <g transform="translate(16 14)" fill="#fff"><rect x="1" y="2" width="30" height="19" rx="3" fill="none" stroke="#fff" stroke-width="2.4"/><path d="M9 27h14M16 21v6" stroke="#fff" stroke-width="2.4" stroke-linecap="round" fill="none"/></g>
+  <text x="62" y="23" fill="#fff" fill-opacity="0.78" font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="10.5" font-weight="600" letter-spacing="0.8">DOWNLOAD FOR</text>
+  <text x="62" y="39" fill="#fff" font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="16" font-weight="700">Mac</text>
+  <text x="62" y="52" fill="#fff" fill-opacity="0.78" font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="10">Intel · DMG</text>
+</svg>
