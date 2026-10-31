@@ -23,13 +23,18 @@ jobs:
           - os: macos-15-intel
             target: x86_64-apple-darwin
             ffarch: amd64
-          - os: macos-14
+            extra: --config src-tauri/release-signing-macos.json
+          # macos-14 is being retired (brownouts from Oct 2026); macos-15 is
+          # also Apple Silicon
+          - os: macos-15
             target: aarch64-apple-darwin
             ffarch: arm64
+            extra: --config src-tauri/release-signing-macos.json
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+            extra: --config src-tauri/release-signing.json
 
     runs-on: ${{ matrix.os }}
 
@@ -128,6 +133,39 @@ jobs:
         run: npm install
         shell: bash
 
+      # Windows: Azure Artifact Signing (account matily-signing, profile
+      # matily-public). src-tauri/release-signing.json wires the signing
+      # command; it is only passed on CI, so local builds stay unsigned.
+      - name: Install the Windows signing tool
+        if: startsWith(matrix.os, 'windows')
+        run: cargo install trusted-signing-cli --locked
+        shell: bash
+
+      # macOS: Developer ID signing and Apple notarization. The values are
+      # forwarded only when the secrets exist (an empty APPLE_CERTIFICATE
+      # would make the bundler fail instead of skipping signing).
+      - name: Apple signing and notarization
+        if: startsWith(matrix.os, 'macos')
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "::warning::No Apple signing secrets; the Mac build will not be notarized."
+            exit 0
+          fi
+          # A pasted certificate may carry line breaks; base64 must not.
+          cert=$(printf '%s' "$APPLE_CERTIFICATE" | tr -d ' \r\n')
+          echo "::add-mask::$cert"
+          echo "APPLE_CERTIFICATE=$cert" >> "$GITHUB_ENV"
+          for v in APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            printf '%s=%s\n' "$v" "$(printf '%s' "${!v}" | tr -d '\r\n')" >> "$GITHUB_ENV"
+          done
+
       # Builds, signs updater packages, uploads installers to the release,
       # and maintains a merged cross-platform latest.json for auto-update.
       - name: Build and release Tauri app
@@ -136,10 +174,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # App registration allowed to sign with the matily-public profile
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         with:
           tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
           releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('NextGenUp {0}', github.ref_name) || '' }}
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} ${{ matrix.extra }}
 
       - name: Upload artifacts (non-release runs)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
