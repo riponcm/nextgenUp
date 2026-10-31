@@ -127,6 +127,10 @@ codesign --force --deep --sign - /Applications/NextGenUp.app
 </p>
 
 <p align="center">
+  <img src="assets/screens/storage.png" alt="Saved files and storage panel: choose where finished files are saved and clean leftover working files in one click" width="860">
+</p>
+
+<p align="center">
   <img src="assets/screens/batch.png" alt="Batch processing multiple images with per-item progress" width="860">
 </p>
 

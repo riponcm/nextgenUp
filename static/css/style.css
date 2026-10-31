@@ -1537,7 +1537,8 @@ footer {
 .stor-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
 .stor-hint { font-size: 12px; color: var(--text-dim); line-height: 1.5; margin-top: 6px; }
 .stor-big { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-.stor-clean { padding: 10px 22px; font-size: 14px; width: auto; }
+.stor-clean { padding: 10px 22px; font-size: 14px; width: auto; margin: 0; }
+#stor-unsaved-row { margin-top: 12px; }
 .stor-error { color: var(--red); font-size: 13px; margin-top: 8px; }
 .stor-ok { color: var(--green); font-size: 13px; margin-top: 8px; }
 .stor-jharu { font-size: 13px; color: var(--text-muted); }
