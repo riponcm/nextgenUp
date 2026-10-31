@@ -56,6 +56,11 @@
                     <span class="badge-dot"></span>
                     <span id="gpu-status">Checking WebGPU...</span>
                 </div>
+                <button class="about-btn hidden" id="storage-btn" title="Saved files and storage" aria-label="Saved files and storage">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                </button>
                 <button class="about-btn" id="about-btn" title="About NextGenUp" aria-label="About NextGenUp">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10"/>
@@ -68,6 +73,48 @@
     </header>
 
     <!-- About Modal -->
+    <!-- Saved files and storage (desktop app only) -->
+    <div class="about-overlay hidden" id="storage-overlay">
+        <div class="about-modal storage-modal">
+            <button class="about-close" id="storage-close" aria-label="Close">&times;</button>
+            <h2>Saved files &amp; storage</h2>
+
+            <div class="stor-section">
+                <h3>Where finished files go</h3>
+                <label class="stor-check">
+                    <input type="checkbox" id="stor-auto">
+                    <span>Save finished files automatically</span>
+                </label>
+                <p class="stor-path" id="stor-path">&nbsp;</p>
+                <div class="stor-actions">
+                    <button class="new-video-btn" id="stor-change">Change folder</button>
+                    <button class="new-video-btn" id="stor-open">Open folder</button>
+                </div>
+                <p class="stor-hint">Results from the server-side tools (video upscaling, background remover, denoise, eraser, colorize, vocal remover, noise remover and the video tools) are copied here the moment they finish, even if this window is closed. The Download and Save buttons still let you save another copy wherever you like.</p>
+                <p class="stor-error hidden" id="stor-settings-error"></p>
+            </div>
+
+            <div class="stor-section">
+                <h3>Leftover working files</h3>
+                <p class="stor-big" id="stor-size">Checking&hellip;</p>
+                <p class="stor-hint" id="stor-detail">Copies of the files you opened and extra temporary files.</p>
+                <label class="stor-check hidden" id="stor-unsaved-row">
+                    <input type="checkbox" id="stor-unsaved">
+                    <span id="stor-unsaved-text"></span>
+                </label>
+                <div class="stor-actions">
+                    <button class="upscale-btn stor-clean" id="stor-clean">Clean now</button>
+                </div>
+                <p class="stor-hint">AI models are never touched. A running job&rsquo;s files are kept.</p>
+                <p class="stor-ok hidden" id="stor-clean-result"></p>
+            </div>
+
+            <div class="stor-section stor-jharu" id="stor-jharu">
+                <p>Need a deeper clean? <a href="https://jharu.matily.org" class="stor-link" id="stor-jharu-link">Jharu</a> is our free, open-source disk cleaner for Mac and Windows.</p>
+            </div>
+        </div>
+    </div>
+
     <div class="about-overlay hidden" id="about-overlay">
         <div class="about-modal">
             <button class="about-close" id="about-close" aria-label="Close">&times;</button>
@@ -1690,5 +1737,6 @@
     <script src="/static/js/vendor/remaster-lib.js"></script>
     <script src="/static/js/audio-app.js"></script>
     <script src="/static/js/vtools-app.js"></script>
+    <script src="/static/js/storage-app.js"></script>
 </body>
 </html>

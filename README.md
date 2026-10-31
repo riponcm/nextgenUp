@@ -152,6 +152,9 @@ codesign --force --deep --sign - /Applications/NextGenUp.app
 | Before/after slider | Drag a divider across the result to compare against the original |
 | Cancellable jobs | Every job can be cancelled mid-run; switch modes and restart instantly |
 | Portrait and landscape | Orientation handled automatically; output capped at 4K (video) / 8K (image) |
+| Saved files folder | The desktop app saves every finished result into one folder you choose (default: Documents/NextGenUp) the moment it finishes, even if the window is closed. Names never overwrite earlier files |
+| Storage cleaner | One header button shows the leftover working files the app keeps and removes them in one click. AI models and unsaved results are never touched without asking |
+| Long jobs stay safe | The computer is kept awake while a job runs and the app asks before closing in the middle of one |
 | Auto-updates | Desktop app updates itself from GitHub releases (cryptographically signed) |
 
 ## How to use
@@ -321,6 +324,15 @@ Yes. Select Ultra mode and tick "Restore faces" — every detected face is align
 
 **Can I make an image clearer without changing its size?**
 Yes — that is the Enhance mode. The AI upscales 4x internally to reconstruct detail, then downscales back to the original dimensions, removing noise, blur, and JPEG artifacts while keeping the exact resolution.
+
+**Where does NextGenUp save my finished files?**
+In the desktop app, every result from the server-side tools (video upscaling, background remover, denoise, eraser, colorize, vocal remover, noise remover, and the video tools) is copied into one folder the moment it finishes. The default is `Documents/NextGenUp`. Click the folder button in the top bar to change it, switch automatic saving off, or open the folder. The Download and Save buttons still let you save another copy anywhere, and a name that already exists gets a number instead of being overwritten.
+
+**How do I free up the disk space NextGenUp uses?**
+Click the folder button in the top bar. The Storage section shows the leftover working files, such as copies of the files you opened and temporary files, and removes them with one click. It never deletes your AI models, your saved files, or a job that is still running. Anything you have not saved yet is only deleted if you tick the extra box. For a deeper clean of caches from other apps, try [Jharu](https://jharu.matily.org), our free open-source disk cleaner for Mac and Windows.
+
+**My long video job finished but I cannot find the file. What do I do?**
+Look in your save folder first (top bar, folder button, Open folder). If automatic saving was off, the result stays in the app's data folder for 24 hours: `%APPDATA%\com.riponcm.nextgenup\outputs` on Windows, `~/Library/Application Support/com.riponcm.nextgenup/outputs` on macOS, and `~/.local/share/com.riponcm.nextgenup/outputs` on Linux. Closing the app during a job stops it, so NextGenUp now asks before closing while a job runs.
 
 **What platforms does NextGenUp support?**
 Desktop apps for macOS (Apple Silicon and Intel), Windows 10/11 x64, and Linux (AppImage/deb). It also runs as a self-hosted web app usable from any browser on your network, including phones and tablets.

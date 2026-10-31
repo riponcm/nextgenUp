@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 from flask import Flask, Response, jsonify, render_template, request, send_file
 
 import paths
+import userfiles
 
 VERSION = '1.2.2'
 
@@ -114,6 +115,11 @@ _procs = {}
 # website poking at localhost) can neither obtain nor send it.
 API_TOKEN = secrets.token_hex(32)
 
+# Set by the desktop shell. Saving to a folder on this computer only makes
+# sense when the server runs on the user's own machine; self-hosted web mode
+# keeps browser downloads.
+DESKTOP = os.environ.get('NEXTGENUP_DESKTOP') == '1'
+
 
 class TaskCancelled(Exception):
     pass
@@ -186,6 +192,157 @@ def load_tasks():
         print(f'[db] load failed: {e}', flush=True)
 
 
+# --- Saved files, automatic saving and leftover files (desktop app) ---
+
+ACTIVE_STATUSES = ('processing', 'pro_processing', 'assembling')
+
+# Newest last; the page polls this to tell the user where a result went
+_recent_saves = []
+_autosave_seen = set()
+_autosave_waiting = {}   # task id -> first time seen completed without output
+
+
+def _active_ids():
+    return {tid for tid, t in tasks.items() if t.get('status') in ACTIVE_STATUSES}
+
+
+def _note_save(entry):
+    _recent_saves.append(entry)
+    del _recent_saves[:-50]
+
+
+def _autosave_once():
+    """Copy every newly finished result into the user's save folder."""
+    settings = userfiles.load_settings()
+    enabled = DESKTOP and settings['auto_save']
+    for tid, task in list(tasks.items()):
+        if tid in _autosave_seen or task.get('status') != 'completed':
+            continue
+        out = task.get('output')
+        if not out:
+            # Parent tasks (stem splitter, video tools) never have an output;
+            # but a runner sets status a moment before the path, so wait
+            first = _autosave_waiting.setdefault(tid, time.time())
+            if time.time() - first > 5:
+                _autosave_seen.add(tid)
+                _autosave_waiting.pop(tid, None)
+            continue
+        if tid.startswith('zip_') or out.endswith('.zip'):
+            _autosave_seen.add(tid)
+            continue
+        if not os.path.exists(out):
+            continue
+        _autosave_seen.add(tid)
+        if not enabled:
+            continue
+        name = userfiles.result_name(task, out)
+        try:
+            os.makedirs(settings['save_dir'], exist_ok=True)
+            dest = userfiles.unique_path(settings['save_dir'], name)
+            shutil.copyfile(out, dest)
+        except OSError as e:
+            task['autosave_error'] = str(e)
+            save_task(tid)
+            _note_save({'id': tid, 'name': name, 'error': str(e), 'ts': time.time()})
+            print(f'[autosave] {tid} failed: {e}', flush=True)
+            continue
+        task['saved'] = True
+        task['saved_to'] = dest
+        save_task(tid)
+        _note_save({'id': tid, 'name': os.path.basename(dest), 'path': dest,
+                    'ts': time.time()})
+
+
+def _autosave_loop():
+    while True:
+        time.sleep(2)
+        try:
+            _autosave_once()
+        except Exception as e:
+            print(f'[autosave] loop error: {e}', flush=True)
+
+
+@app.route('/api/settings', methods=['GET', 'POST'])
+def settings_endpoint():
+    if not _local_only():
+        return jsonify({'error': 'Not authorized'}), 403
+    if request.method == 'POST':
+        if not _write_authorized():
+            return jsonify({'error': 'Not authorized'}), 403
+        data = request.json or {}
+        cur, err = userfiles.update_settings(
+            auto_save=data.get('auto_save'), save_dir=data.get('save_dir'))
+        if err:
+            return jsonify({'error': err}), 400
+    else:
+        cur = userfiles.load_settings()
+    return jsonify({'desktop': DESKTOP, 'auto_save': cur['auto_save'],
+                    'save_dir': cur['save_dir'],
+                    'default_dir': userfiles.default_save_dir()})
+
+
+@app.route('/api/saves/recent')
+def saves_recent():
+    if not _local_only():
+        return jsonify({'error': 'Not authorized'}), 403
+    try:
+        since = float(request.args.get('since', 0))
+    except ValueError:
+        since = 0
+    return jsonify({'now': time.time(),
+                    'items': [e for e in _recent_saves if e['ts'] > since]})
+
+
+@app.route('/api/jobs/active')
+def jobs_active():
+    if not _local_only():
+        return jsonify({'error': 'Not authorized'}), 403
+    return jsonify({'active': len(_active_ids())})
+
+
+def _storage_buckets():
+    return userfiles.classify(app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER'],
+                              app.config['FRAMES_FOLDER'], tasks, _active_ids())
+
+
+@app.route('/api/storage')
+def storage_report():
+    if not _local_only():
+        return jsonify({'error': 'Not authorized'}), 403
+    rep = userfiles.summarize(_storage_buckets())
+    rep['active_jobs'] = len(_active_ids())
+    return jsonify(rep)
+
+
+@app.route('/api/storage/clean', methods=['POST'])
+def storage_clean():
+    if not _write_authorized():
+        return jsonify({'error': 'Not authorized'}), 403
+    include_unsaved = bool((request.json or {}).get('include_unsaved'))
+    result = userfiles.clean(_storage_buckets(), include_unsaved)
+    userfiles.remove_empty_dirs(app.config['UPLOAD_FOLDER'], app.config['FRAMES_FOLDER'],
+                                app.config['OUTPUT_FOLDER'])
+    return jsonify(result)
+
+
+@app.route('/api/reveal', methods=['POST'])
+def reveal_in_file_manager():
+    """Show a saved result (or the save folder) in Finder / Explorer. Only
+    paths inside the user's save folder are allowed."""
+    if not _write_authorized():
+        return jsonify({'error': 'Not authorized'}), 403
+    path = (request.json or {}).get('path') or userfiles.load_settings()['save_dir']
+    if not os.path.isabs(path) or not userfiles.within(path, userfiles.load_settings()['save_dir']):
+        return jsonify({'error': 'Not allowed'}), 400
+    if not os.path.exists(path):
+        return jsonify({'error': 'Not found'}), 404
+    try:
+        userfiles.reveal(path)
+    except OSError as e:
+        return jsonify({'error': str(e)}), 500
+    return jsonify({'status': 'ok'})
+
+
 # --- Auto-cleanup of old files ---
 
 CLEANUP_HOURS = float(os.environ.get('CLEANUP_HOURS', 24))
@@ -241,7 +398,7 @@ def capabilities():
 
 # Domains the About dialog may open in the system browser. The desktop
 # webview can't open external links itself, so it asks the local server.
-OPEN_ALLOWED = {'matily.org', 'www.matily.org', 'github.com'}
+OPEN_ALLOWED = {'matily.org', 'www.matily.org', 'jharu.matily.org', 'github.com'}
 
 
 @app.route('/api/open', methods=['POST'])
@@ -321,6 +478,9 @@ def save_to_path():
         return jsonify({'error': 'Invalid destination path'}), 400
     try:
         shutil.copyfile(src, dest)
+        if tasks.get(task_id):
+            tasks[task_id]['saved'] = True
+            save_task(task_id)
         return jsonify({'status': 'ok', 'path': dest})
     except OSError as e:
         return jsonify({'error': str(e)}), 500
@@ -1750,6 +1910,14 @@ if __name__ == '__main__':
                    app.config['FRAMES_FOLDER'], paths.data('models')):
         os.makedirs(folder, exist_ok=True)
     load_tasks()
+    if DESKTOP:
+        # Nothing from a previous session can resume, so its uploaded copies
+        # and extracted frames are only taking up space
+        userfiles.purge_folder(app.config['UPLOAD_FOLDER'])
+        userfiles.purge_folder(app.config['FRAMES_FOLDER'])
+    # Results finished before this start are not saved retroactively
+    _autosave_seen.update(tid for tid, t in tasks.items() if t.get('status') == 'completed')
+    threading.Thread(target=_autosave_loop, daemon=True).start()
     threading.Thread(target=_cleanup_loop, daemon=True).start()
     port = int(os.environ.get('PORT', 5000))
     # Self-hosted web mode serves the LAN (0.0.0.0) as documented; the

@@ -12,7 +12,7 @@ Key facts:
 - Image modes: Quick (browser AI), Quality (FFmpeg Lanczos+CAS), Enhance (same resolution, AI cleanup), Ultra (server AI, works from any device)
 - Video modes: Basic (FFmpeg) and Pro (Real-ESRGAN frame by frame), audio preserved, portrait/landscape automatic
 - Tools: Image Upscale, Background Remover (transparent/white/custom color), Denoise & Deblur, Magic Eraser (brush + AI inpaint with undo), Old Photo Restore (colorize + faces + detail), Vocal Remover (vocals + instrumental stems), Noise Remover (audio), Mastering (measurement-driven, explained decisions, tuning panel, loudness-matched A/B), Tag Editor (lossless strip/rewrite of MP3/WAV tags), Video Upscale 4K (single and bulk), Video Tools (remove noise/music/voice from video audio, compress to target size, GIF maker)
-- Extras: batch processing with zip export for images and videos, before/after comparison slider, cancellable jobs, native save dialogs, signed auto-updates
+- Extras: batch processing with zip export for images and videos, before/after comparison slider, cancellable jobs, native save dialogs, a save-folder setting with automatic saving of finished results, a one-click storage cleaner for leftover working files, keep-awake and close warning during long jobs, signed auto-updates
 - Limits: images up to 8K output, videos up to 4K output, uploads up to 2 GB
 - GPU: optional — WebGPU/WASM in the browser, CPU on the server
 - Maker: Matily (https://matily.org); repository: https://github.com/riponcm/nextgenUp
@@ -36,5 +36,7 @@ Key facts:
 - Colorize black-and-white photos free: yes, DDColor-based Old Photo Restore
 - Compared with Upscayl: Upscayl is images only; NextGenUp also upscales video and restores faces
 - Compared with Video2X: Video2X is video-focused and technical; NextGenUp is point-and-click and also handles images
+- Where finished files are saved: the desktop app copies every finished result into one folder (default Documents/NextGenUp, changeable from the folder button in the top bar) as soon as it finishes
+- Free up disk space used by NextGenUp: the Storage section in the top-bar folder button removes leftover working files in one click and never touches AI models or saved files
 - Offline use: yes, fully offline after install
 - Watermarks or accounts: none
