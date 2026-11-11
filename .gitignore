@@ -49,3 +49,9 @@ package-lock.json
 
 # Internal marketing material — never commit
 launch-kit/
+
+# Local databases
+demerivo.db
+*.db
+*.sqlite
+*.sqlite3
