@@ -1,0 +1,51 @@
+# =============================================================================
+# Demerivo PixelFix — Production CPU AI Background Worker Container
+# =============================================================================
+
+FROM python:3.11-slim AS runtime
+
+LABEL maintainer="Demerivo Engineering <engineering@demerivo.com>"
+LABEL product="Demerivo PixelFix"
+LABEL component="ai-worker"
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    OMP_NUM_THREADS=2 \
+    MKL_NUM_THREADS=2
+
+# Install minimal OS dependencies for math runtimes and process monitoring
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    ca-certificates \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Security: Create non-root execution user and group
+RUN groupadd -g 10001 demerivo && \
+    useradd -u 10001 -g demerivo -m -s /bin/bash demerivo
+
+WORKDIR /app
+
+# Install Python production dependencies
+COPY requirements-prod.txt .
+RUN pip install --no-cache-dir -r requirements-prod.txt
+
+# Copy application source code
+COPY demerivo/ ./demerivo/
+
+# Set ownership to non-root user
+RUN chown -R demerivo:demerivo /app
+
+# Switch to non-root execution context
+USER demerivo
+
+# Worker healthcheck verifying the runner process is active
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD pgrep -f "demerivo.workers.runner" > /dev/null || exit 1
+
+STOPSIGNAL SIGTERM
+
+# Execute standalone background worker supervisor
+CMD ["python", "-m", "demerivo.workers.runner"]
