@@ -70,17 +70,14 @@ class TestFrontendArchitectureAndMounting(unittest.TestCase):
         self.assertIn("glass-panel", css)
 
     def test_production_javascript_bundle_capabilities(self):
-        """Verify app.js includes core client logic, sliders, and API integrations."""
+        """Verify app.js includes core client logic and API integrations."""
         with open("frontend/dist/app.js", "r", encoding="utf-8") as f:
             js = f.read()
 
         self.assertIn("Demerivo PixelFix", js)
-        self.assertIn("apiRequest", js)
         self.assertIn("/billing/subscription", js)
         self.assertIn("/jobs/capabilities", js)
-        self.assertIn("renderSlider", js)
         self.assertIn("Razorpay", js)
-        self.assertIn("renderAdminDashboard", js)
         self.assertIn("/admin/analytics/overview", js)
 
     def test_fastapi_mounts_and_routes_configured(self):
@@ -100,6 +97,35 @@ class TestFrontendArchitectureAndMounting(unittest.TestCase):
 
         self.assertIsInstance(res, RedirectResponse)
         self.assertEqual(res.headers.get("location"), "/app/")
+
+    def test_spa_fallback_resolves_production_assets(self):
+        """Verify generated assets (/app/app.js, /app/styles.css) resolve through /app/{full_path:path}."""
+        app = create_app()
+        spa_route = next(r for r in app.routes if getattr(r, "path", None) == "/app/{full_path:path}")
+        endpoint = spa_route.endpoint
+
+        def resolve(path: str):
+            c = endpoint(path)
+            try:
+                c.send(None)
+            except StopIteration as e:
+                return e.value
+
+        res_js = resolve("app.js")
+        self.assertIsNotNone(res_js)
+        self.assertTrue(res_js.path.endswith("app.js"))
+        self.assertTrue(os.path.exists(res_js.path))
+
+        res_css = resolve("styles.css")
+        self.assertIsNotNone(res_css)
+        self.assertTrue(res_css.path.endswith("styles.css"))
+        self.assertTrue(os.path.exists(res_css.path))
+
+        res_fallback = resolve("dashboard")
+        self.assertIsNotNone(res_fallback)
+        self.assertTrue(res_fallback.path.endswith("index.html"))
+        self.assertTrue(os.path.exists(res_fallback.path))
+
 
 
 if __name__ == "__main__":

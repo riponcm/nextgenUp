@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from './api';
 import {
-  Invoice,
   Plan,
   ProcessingJob,
   Subscription,
@@ -154,7 +153,7 @@ export const App: React.FC = () => {
             <PricingTable
               plans={plans}
               currentPlanCode={subscription?.plan_code || 'free'}
-              onSelectPlan={(code) => {
+              onSelectPlan={() => {
                 if (!user) {
                   setAuthModal('register');
                 } else {

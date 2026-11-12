@@ -6,24 +6,14 @@ import {
   Cpu,
   CreditCard,
   Coins,
-  Activity,
-  ShieldAlert,
   Search,
   RefreshCw,
   AlertTriangle,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  ArrowUpRight,
   TrendingUp,
   FileText,
-  Filter,
   LogOut,
-  ChevronRight,
   UserCheck,
-  UserX,
   Server,
-  Database,
   Lock,
 } from 'lucide-react';
 import { api } from '../../api';
@@ -54,22 +44,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onE
   // Data states
   const [overview, setOverview] = useState<AdminOverviewMetrics | null>(null);
   const [users, setUsers] = useState<AdminUserItem[]>([]);
-  const [usersTotal, setUsersTotal] = useState<number>(0);
-  const [usersPage, setUsersPage] = useState<number>(1);
+  const [, setUsersTotal] = useState<number>(0);
+  const [usersPage] = useState<number>(1);
   const [usersSearch, setUsersSearch] = useState<string>('');
   const [usersStatus, setUsersStatus] = useState<string>('all');
 
   const [tenants, setTenants] = useState<AdminTenantItem[]>([]);
-  const [tenantsTotal, setTenantsTotal] = useState<number>(0);
+  const [, setTenantsTotal] = useState<number>(0);
   const [tenantsSearch, setTenantsSearch] = useState<string>('');
 
   const [jobs, setJobs] = useState<AdminJobItem[]>([]);
-  const [jobsTotal, setJobsTotal] = useState<number>(0);
+  const [, setJobsTotal] = useState<number>(0);
   const [jobsStatus, setJobsStatus] = useState<string>('all');
   const [jobsOp, setJobsOp] = useState<string>('all');
 
   const [subscriptions, setSubscriptions] = useState<AdminSubscriptionItem[]>([]);
-  const [subsTotal, setSubsTotal] = useState<number>(0);
+  const [, setSubsTotal] = useState<number>(0);
   const [subsPlan, setSubsPlan] = useState<string>('all');
 
   const [revenue, setRevenue] = useState<any>(null);
@@ -83,8 +73,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, onE
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [actionReason, setActionReason] = useState<string>('');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
-  const [selectedTenant, setSelectedTenant] = useState<any>(null);
-  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [, setSelectedTenant] = useState<any>(null);
+  const [, setSelectedJob] = useState<any>(null);
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [newPlanCode, setNewPlanCode] = useState<string>('starter');
 

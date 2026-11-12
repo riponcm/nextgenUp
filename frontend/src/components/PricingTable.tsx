@@ -12,7 +12,6 @@ export const PricingTable: React.FC<PricingTableProps> = ({
   plans,
   currentPlanCode = 'free',
   onSelectPlan,
-  isAuthenticated,
 }) => {
   const [isAnnual, setIsAnnual] = useState(false);
 

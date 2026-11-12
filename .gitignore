@@ -45,7 +45,8 @@ src-tauri/gen/
 dist/
 build/
 *.spec.bak
-package-lock.json
+/package-lock.json
+!frontend/package-lock.json
 
 # Internal marketing material — never commit
 launch-kit/
