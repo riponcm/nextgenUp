@@ -97,12 +97,23 @@ class TestUploadSecurity(unittest.TestCase):
         self.assertIn("exceed maximum allowed limits", str(ctx.exception))
 
     def test_filename_sanitization_and_traversal(self):
+        # POSIX directory traversal
         self.assertEqual(sanitize_filename("../../../etc/passwd"), "passwd")
+        self.assertEqual(sanitize_filename("../../var/log/syslog"), "syslog")
+        # Windows-style directory traversal (both lower and upper case)
         self.assertEqual(sanitize_filename("..\\..\\windows\\system32\\cmd.exe"), "cmd.exe")
+        self.assertEqual(sanitize_filename("..\\..\\Windows\\System32\\cmd.exe"), "cmd.exe")
+        self.assertEqual(sanitize_filename(r"..\..\Windows\System32\cmd.exe"), "cmd.exe")
+        # Mixed separators and path traversal
+        self.assertEqual(sanitize_filename(r"folder\subfolder/traversal\photo.jpg"), "photo.jpg")
+        # Hidden files and extensions
         self.assertEqual(sanitize_filename(".hidden_file.jpg"), "hidden_file.jpg")
         self.assertEqual(sanitize_filename("valid_name-123.PNG"), "valid_name-123.PNG")
+        # Empty, None, or directory-only traversal
         self.assertEqual(sanitize_filename(""), "image.png")
         self.assertEqual(sanitize_filename(None), "image.png")
+        self.assertEqual(sanitize_filename("../../.."), "image.png")
+        self.assertEqual(sanitize_filename("..\\..\\.."), "image.png")
 
 
 if __name__ == "__main__":

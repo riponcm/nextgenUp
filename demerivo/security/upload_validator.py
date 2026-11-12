@@ -1,6 +1,7 @@
 """Image upload validation, magic bytes inspection, and security sanitization."""
 
 import io
+import posixpath
 import re
 import uuid
 from dataclasses import dataclass
@@ -46,8 +47,10 @@ def sanitize_filename(filename: Optional[str]) -> str:
     """Sanitize user-provided filename, stripping directory separators and unsafe characters."""
     if not filename:
         return "image.png"
-    # Strip any directory path components
-    basename = Path(filename).name
+    # Normalize directory separators across Windows and POSIX environments
+    normalized = str(filename).replace("\\", "/")
+    # Strip any directory path components using POSIX basename
+    basename = posixpath.basename(normalized.rstrip("/"))
     # Strip leading dots (hidden files)
     basename = basename.lstrip(".")
     # Replace unsafe characters
