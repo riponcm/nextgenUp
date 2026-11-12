@@ -6,3 +6,4 @@ numpy>=1.26
 # Face restoration and AI image processing
 opencv-python-headless>=4.10
 certifi>=2024.0
+email-validator>=2.0.0
