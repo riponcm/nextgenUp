@@ -154,12 +154,21 @@ jobs:
 
       - name: Start Compose Stack
         env:
-          DEMERIVO_JWT_SECRET: testing-jwt-secret-key-at-least-32chars
-          DEMERIVO_ADMIN_SECRET: testing-admin-secret-token-32chars
-          DEMERIVO_DATABASE_URL: postgresql+asyncpg://demerivo:demerivo_secret@postgres:5432/demerivo
+          DEMERIVO_SUPABASE_JWT_SECRET: testing-jwt-secret-key-at-least-32chars
+          DEMERIVO_ADMIN_SECRET_TOKEN: testing-admin-secret-token-32chars
           POSTGRES_PASSWORD: demerivo_secret
         run: |
           docker compose up -d
+
+      - name: Collect Docker Compose Diagnostics
+        if: always()
+        run: |
+          echo "=== Docker Compose Process Status ==="
+          docker compose ps -a || true
+          echo "=== API Container Logs (tail 200) ==="
+          docker compose logs --no-color --tail=200 api || true
+          echo "=== API Container Health Inspection ==="
+          docker inspect --format='{{json .State.Health}}' demerivo-api || true
 
       - name: Wait & Probe Health Endpoints
         run: |

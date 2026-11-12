@@ -301,3 +301,6 @@ def create_app() -> FastAPI:
             return RedirectResponse(url="/app/")
 
     return app
+
+
+app = create_app()
