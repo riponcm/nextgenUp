@@ -1493,13 +1493,15 @@ def test_postgresql_migration_and_concurrency_integration():
                         id VARCHAR(36) PRIMARY KEY,
                         job_id VARCHAR(36),
                         transaction_type VARCHAR(32)
-                    );
+                    )
+                """))
+                conn.execute(text(f"""
                     CREATE UNIQUE INDEX uq_credit_tx_job_type
-                    ON {schema_unrelated}.unrelated_audit_table (job_id, transaction_type);
+                    ON {schema_unrelated}.unrelated_audit_table (job_id, transaction_type)
                 """))
                 conn.commit()
 
-            # Insert valid historical records in schema_a
+            # Insert valid historical records in schema_a using separate single-statement executions
             user_id = f"usr_pg_{uuid.uuid4().hex[:8]}"
             tenant_id = f"tnt_pg_{uuid.uuid4().hex[:8]}"
             wallet_id = f"wlt_pg_{uuid.uuid4().hex[:8]}"
@@ -1507,27 +1509,45 @@ def test_postgresql_migration_and_concurrency_integration():
             job_failed = f"job-fail-{uuid.uuid4().hex[:6]}"
 
             with engine_a.connect() as conn:
-                conn.execute(text("""
-                    INSERT INTO users (id, email, is_active) VALUES (:uid, 'pguser_a@demerivo.test', TRUE);
-                    INSERT INTO tenants (id, name, slug, owner_id) VALUES (:tid, 'PG Tenant A', :slug, :uid);
-                    INSERT INTO wallets (id, tenant_id, balance) VALUES (:wid, :tid, 100);
-                    INSERT INTO jobs (id, tenant_id, user_id, operation_type, input_key, credit_cost, status)
-                    VALUES (:jcomp, :tid, :uid, 'enhance', 'input/key1.jpg', 10, 'completed'),
-                           (:jfail, :tid, :uid, 'enhance', 'input/key2.jpg', 10, 'failed');
-                    -- Completed job transactions
-                    INSERT INTO credit_transactions (id, tenant_id, wallet_id, user_id, job_id, transaction_type, amount, balance_after)
-                    VALUES (gen_random_uuid()::text, :tid, :wid, :uid, NULL, 'allocation', 100, 100),
-                           (gen_random_uuid()::text, :tid, :wid, :uid, :jcomp, 'reservation', -10, 90),
-                           (gen_random_uuid()::text, :tid, :wid, :uid, :jcomp, 'consumption', 0, 90);
-                    -- Failed job transactions
-                    INSERT INTO credit_transactions (id, tenant_id, wallet_id, user_id, job_id, transaction_type, amount, balance_after)
-                    VALUES (gen_random_uuid()::text, :tid, :wid, :uid, :jfail, 'reservation', -10, 80),
-                           (gen_random_uuid()::text, :tid, :wid, :uid, :jfail, 'refund', 10, 90);
-                """), {
-                    "uid": user_id, "tid": tenant_id, "wid": wallet_id,
-                    "slug": f"pg-slug-a-{uuid.uuid4().hex[:6]}",
-                    "jcomp": job_completed, "jfail": job_failed,
-                })
+                conn.execute(
+                    text("INSERT INTO users (id, email, is_active) VALUES (:uid, 'pguser_a@demerivo.test', TRUE)"),
+                    {"uid": user_id},
+                )
+                conn.execute(
+                    text("INSERT INTO tenants (id, name, slug, owner_id) VALUES (:tid, 'PG Tenant A', :slug, :uid)"),
+                    {"tid": tenant_id, "slug": f"pg-slug-a-{uuid.uuid4().hex[:6]}", "uid": user_id},
+                )
+                conn.execute(
+                    text("INSERT INTO wallets (id, tenant_id, balance) VALUES (:wid, :tid, 100)"),
+                    {"wid": wallet_id, "tid": tenant_id},
+                )
+                conn.execute(
+                    text("""
+                        INSERT INTO jobs (id, tenant_id, user_id, operation_type, input_key, credit_cost, status)
+                        VALUES (:jcomp, :tid, :uid, 'enhance', 'input/key1.jpg', 10, 'completed'),
+                               (:jfail, :tid, :uid, 'enhance', 'input/key2.jpg', 10, 'failed')
+                    """),
+                    {"jcomp": job_completed, "jfail": job_failed, "tid": tenant_id, "uid": user_id},
+                )
+                # Completed job transactions: allocation, reservation, consumption
+                conn.execute(
+                    text("""
+                        INSERT INTO credit_transactions (id, tenant_id, wallet_id, user_id, job_id, transaction_type, amount, balance_after)
+                        VALUES (gen_random_uuid()::text, :tid, :wid, :uid, NULL, 'allocation', 100, 100),
+                               (gen_random_uuid()::text, :tid, :wid, :uid, :jcomp, 'reservation', -10, 90),
+                               (gen_random_uuid()::text, :tid, :wid, :uid, :jcomp, 'consumption', 0, 90)
+                    """),
+                    {"tid": tenant_id, "wid": wallet_id, "uid": user_id, "jcomp": job_completed},
+                )
+                # Failed job transactions: reservation, refund
+                conn.execute(
+                    text("""
+                        INSERT INTO credit_transactions (id, tenant_id, wallet_id, user_id, job_id, transaction_type, amount, balance_after)
+                        VALUES (gen_random_uuid()::text, :tid, :wid, :uid, :jfail, 'reservation', -10, 80),
+                               (gen_random_uuid()::text, :tid, :wid, :uid, :jfail, 'refund', 10, 90)
+                    """),
+                    {"tid": tenant_id, "wid": wallet_id, "uid": user_id, "jfail": job_failed},
+                )
                 conn.commit()
 
             # Apply migration 0005 in schema_a (current_schema() is schema_a)
@@ -1672,20 +1692,33 @@ def test_postgresql_migration_and_concurrency_integration():
             job_dup = f"job-pg-dup-{uuid.uuid4().hex[:6]}"
 
             with engine_b.connect() as conn:
-                conn.execute(text("""
-                    INSERT INTO users (id, email, is_active) VALUES (:uid, 'pguser_b@demerivo.test', TRUE);
-                    INSERT INTO tenants (id, name, slug, owner_id) VALUES (:tid, 'PG Tenant B', :slug, :uid);
-                    INSERT INTO wallets (id, tenant_id, balance) VALUES (:wid, :tid, 100);
-                    INSERT INTO jobs (id, tenant_id, user_id, operation_type, input_key, credit_cost, status)
-                    VALUES (:jdup, :tid, :uid, 'enhance', 'input/key_dup.jpg', 10, 'failed');
-                    INSERT INTO credit_transactions (id, tenant_id, wallet_id, user_id, job_id, transaction_type, amount, balance_after)
-                    VALUES (gen_random_uuid()::text, :tid, :wid, :uid, :jdup, 'refund', 10, 100),
-                           (gen_random_uuid()::text, :tid, :wid, :uid, :jdup, 'refund', 10, 110);
-                """), {
-                    "uid": user_b, "tid": tenant_b, "wid": wallet_b,
-                    "slug": f"pg-slug-b-{uuid.uuid4().hex[:6]}",
-                    "jdup": job_dup,
-                })
+                conn.execute(
+                    text("INSERT INTO users (id, email, is_active) VALUES (:uid, 'pguser_b@demerivo.test', TRUE)"),
+                    {"uid": user_b},
+                )
+                conn.execute(
+                    text("INSERT INTO tenants (id, name, slug, owner_id) VALUES (:tid, 'PG Tenant B', :slug, :uid)"),
+                    {"tid": tenant_b, "slug": f"pg-slug-b-{uuid.uuid4().hex[:6]}", "uid": user_b},
+                )
+                conn.execute(
+                    text("INSERT INTO wallets (id, tenant_id, balance) VALUES (:wid, :tid, 100)"),
+                    {"wid": wallet_b, "tid": tenant_b},
+                )
+                conn.execute(
+                    text("""
+                        INSERT INTO jobs (id, tenant_id, user_id, operation_type, input_key, credit_cost, status)
+                        VALUES (:jdup, :tid, :uid, 'enhance', 'input/key_dup.jpg', 10, 'failed')
+                    """),
+                    {"jdup": job_dup, "tid": tenant_b, "uid": user_b},
+                )
+                conn.execute(
+                    text("""
+                        INSERT INTO credit_transactions (id, tenant_id, wallet_id, user_id, job_id, transaction_type, amount, balance_after)
+                        VALUES (gen_random_uuid()::text, :tid, :wid, :uid, :jdup, 'refund', 10, 100),
+                               (gen_random_uuid()::text, :tid, :wid, :uid, :jdup, 'refund', 10, 110)
+                    """),
+                    {"tid": tenant_b, "wid": wallet_b, "uid": user_b, "jdup": job_dup},
+                )
                 conn.commit()
 
             # Migration 0005 MUST fail due to existing duplicate refunds
