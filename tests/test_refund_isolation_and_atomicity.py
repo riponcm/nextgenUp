@@ -1434,13 +1434,14 @@ def test_postgresql_migration_and_concurrency_integration():
     # Use uniquely named temporary schemas for test isolation; NEVER drop public schema
     schema_a = f"test_phase6_a_{uuid.uuid4().hex[:8]}"
     schema_b = f"test_phase6_b_{uuid.uuid4().hex[:8]}"
+    schema_unrelated = f"test_unrelated_{uuid.uuid4().hex[:8]}"
     created_schemas = []
 
     try:
         # 1. Create isolated schemas
         try:
             with base_engine.connect() as conn:
-                for s in [schema_a, schema_b]:
+                for s in [schema_a, schema_b, schema_unrelated]:
                     conn.execute(text(f"CREATE SCHEMA {s}"))
                     created_schemas.append(s)
                 conn.commit()
@@ -1475,20 +1476,26 @@ def test_postgresql_migration_and_concurrency_integration():
                     conn.execute(text(sql))
                     conn.commit()
 
-            # Add legacy unique constraint uq_credit_tx_job_type on credit_transactions
+            # Add legacy unique constraint uq_credit_tx_job_type on credit_transactions in schema_a
             with engine_a.connect() as conn:
                 conn.execute(text("""
                     ALTER TABLE credit_transactions 
                     ADD CONSTRAINT uq_credit_tx_job_type UNIQUE (job_id, transaction_type);
                 """))
-                # Also create an unrelated table with an index named uq_credit_tx_job_type
-                conn.execute(text("""
-                    CREATE TABLE unrelated_audit_table (
+                conn.commit()
+
+            # In separate schema_unrelated, create unrelated_audit_table with an index having
+            # the exact same name: uq_credit_tx_job_type. PostgreSQL permits identical index names
+            # only across different schemas.
+            with base_engine.connect() as conn:
+                conn.execute(text(f"""
+                    CREATE TABLE {schema_unrelated}.unrelated_audit_table (
                         id VARCHAR(36) PRIMARY KEY,
                         job_id VARCHAR(36),
                         transaction_type VARCHAR(32)
                     );
-                    CREATE UNIQUE INDEX uq_credit_tx_job_type ON unrelated_audit_table (job_id, transaction_type);
+                    CREATE UNIQUE INDEX uq_credit_tx_job_type
+                    ON {schema_unrelated}.unrelated_audit_table (job_id, transaction_type);
                 """))
                 conn.commit()
 
@@ -1523,7 +1530,7 @@ def test_postgresql_migration_and_concurrency_integration():
                 })
                 conn.commit()
 
-            # Apply migration 0005 in schema_a
+            # Apply migration 0005 in schema_a (current_schema() is schema_a)
             with engine_a.connect() as conn:
                 conn.execute(text(mig_0005_sql))
                 conn.commit()
@@ -1538,14 +1545,14 @@ def test_postgresql_migration_and_concurrency_integration():
                 """), {"s": schema_a}).first()
                 assert old_con is None
 
-                # Verify unrelated same-name index on unrelated_audit_table was NOT dropped!
+                # Verify unrelated same-name index on schema_unrelated.unrelated_audit_table was NOT dropped!
                 unrelated_idx = conn.execute(text("""
                     SELECT 1 FROM pg_index ix
                     JOIN pg_class i ON i.oid = ix.indexrelid
                     JOIN pg_class t ON t.oid = ix.indrelid
                     JOIN pg_namespace n ON n.oid = t.relnamespace
                     WHERE n.nspname = :s AND t.relname = 'unrelated_audit_table' AND i.relname = 'uq_credit_tx_job_type'
-                """), {"s": schema_a}).first()
+                """), {"s": schema_unrelated}).first()
                 assert unrelated_idx is not None
 
                 # Verify new partial unique index exists and is structurally correct
