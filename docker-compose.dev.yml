@@ -1,0 +1,47 @@
+# Demerivo PixelFix — Local Development Docker Compose Override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: demerivo_dev
+      POSTGRES_USER: demerivo_dev
+      POSTGRES_PASSWORD: demerivo_dev_password
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      target: runtime
+    environment:
+      DEMERIVO_ENV: development
+      DEMERIVO_LOG_FORMAT: text
+      DEMERIVO_LOG_LEVEL: DEBUG
+      DEMERIVO_ADMIN_SECRET: dev-insecure-admin-secret-token-32chars
+      DEMERIVO_JWT_SECRET: dev-insecure-jwt-secret-key-at-least-32chars
+      DATABASE_URL: postgresql+asyncpg://demerivo_dev:demerivo_dev_password@postgres:5432/demerivo_dev
+      REDIS_URL: redis://redis:6379/0
+      DEMERIVO_ADMIN_ALLOWED_CIDR: "127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./demerivo:/app/demerivo:ro
+      - ./storage_data:/app/storage_data:rw
+    command: ["uvicorn", "demerivo.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  worker:
+    environment:
+      DEMERIVO_ENV: development
+      DEMERIVO_LOG_FORMAT: text
+      DEMERIVO_LOG_LEVEL: DEBUG
+      DATABASE_URL: postgresql+asyncpg://demerivo_dev:demerivo_dev_password@postgres:5432/demerivo_dev
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./demerivo:/app/demerivo:ro
+      - ./storage_data:/app/storage_data:rw

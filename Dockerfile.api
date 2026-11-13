@@ -1,0 +1,71 @@
+# =============================================================================
+# Demerivo PixelFix — Production API & Frontend Container (Multi-Stage Build)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build React + TypeScript Frontend
+# -----------------------------------------------------------------------------
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY frontend/ ./
+RUN npm run build
+
+# -----------------------------------------------------------------------------
+# Stage 2: Production Python API Runtime
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim AS runtime
+
+LABEL maintainer="Demerivo Engineering <engineering@demerivo.com>"
+LABEL product="Demerivo PixelFix"
+LABEL component="api"
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PORT=8000
+
+# Install minimal OS dependencies for health check & native math libraries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libgomp1 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Security: Create non-root execution user and group
+RUN groupadd -g 10001 demerivo && \
+    useradd -u 10001 -g demerivo -m -s /bin/bash demerivo
+
+WORKDIR /app
+
+# Install Python production dependencies
+COPY requirements-prod.txt .
+RUN pip install --no-cache-dir -r requirements-prod.txt
+
+# Copy backend application source code
+COPY demerivo/ ./demerivo/
+COPY migrations/ ./migrations/
+
+# Copy compiled frontend assets from Stage 1
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+
+# Set ownership to non-root user
+RUN chown -R demerivo:demerivo /app
+
+# Switch to non-root execution context
+USER demerivo
+
+EXPOSE 8000
+
+# Container liveness health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/healthz || exit 1
+
+STOPSIGNAL SIGTERM
+
+# Run production ASGI server with graceful worker shutdown
+CMD ["uvicorn", "demerivo.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--timeout-keep-alive", "65"]

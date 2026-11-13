@@ -7,6 +7,7 @@ __pycache__/
 # Secrets and credentials — never commit these
 .env
 .env.*
+!.env.example
 *.key
 *.pem
 *.p12
@@ -44,7 +45,14 @@ src-tauri/gen/
 dist/
 build/
 *.spec.bak
-package-lock.json
+/package-lock.json
+!frontend/package-lock.json
 
 # Internal marketing material — never commit
 launch-kit/
+
+# Local databases
+demerivo.db
+*.db
+*.sqlite
+*.sqlite3
