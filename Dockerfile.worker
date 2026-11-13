@@ -27,23 +27,21 @@ RUN groupadd -g 10001 demerivo && \
     useradd -u 10001 -g demerivo -m -s /bin/bash demerivo
 
 WORKDIR /app
+RUN chown demerivo:demerivo /app
 
 # Install Python production dependencies
 COPY requirements-prod.txt .
 RUN pip install --no-cache-dir -r requirements-prod.txt
 
-# Copy application source code
-COPY demerivo/ ./demerivo/
-
-# Set ownership to non-root user
-RUN chown -R demerivo:demerivo /app
+# Copy application source code with non-root ownership
+COPY --chown=demerivo:demerivo demerivo/ ./demerivo/
 
 # Switch to non-root execution context
 USER demerivo
 
-# Worker healthcheck verifying the runner process is active
+# Worker healthcheck verifying actual worker thread activity and heartbeat freshness
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD pgrep -f "demerivo.workers.runner" > /dev/null || exit 1
+    CMD python -c "import os, time, sys; p = '/tmp/worker-heartbeat'; sys.exit(0 if os.path.exists(p) and (time.time() - os.path.getmtime(p)) < 60 else 1)"
 
 STOPSIGNAL SIGTERM
 

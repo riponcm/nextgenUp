@@ -576,6 +576,14 @@ def test_docker_compose_security_configuration():
     assert "frontend-net" in networks
     assert "backend-net" in networks
 
+    # Verify worker service production configuration
+    worker_service = services["worker"]
+    assert worker_service.get("stop_grace_period") == "30s", "Worker service must define 30s stop_grace_period"
+    worker_env = [str(e) for e in worker_service.get("environment", [])]
+    assert any("DEMERIVO_SUPABASE_JWT_SECRET" in e for e in worker_env), (
+        "Worker environment must receive DEMERIVO_SUPABASE_JWT_SECRET"
+    )
+
 
 def test_dockerfiles_run_as_non_root():
     """Verifies Dockerfiles enforce non-root execution and healthchecks."""
@@ -591,6 +599,13 @@ def test_dockerfiles_run_as_non_root():
             f"{dockerfile} must run as non-root user 'demerivo' (UID 10001)"
         )
         assert "HEALTHCHECK" in content, f"{dockerfile} must define a HEALTHCHECK"
+
+    # Verify Dockerfile.worker layer optimization and heartbeat healthcheck
+    worker_df = os.path.join(root_dir, "Dockerfile.worker")
+    with open(worker_df, "r", encoding="utf-8") as f:
+        worker_content = f.read()
+    assert "--chown=demerivo:demerivo" in worker_content, "Dockerfile.worker must use --chown"
+    assert "worker-heartbeat" in worker_content, "Dockerfile.worker must check worker heartbeat"
 
 
 def test_nginx_security_and_admin_isolation_config():

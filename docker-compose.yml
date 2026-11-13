@@ -122,12 +122,14 @@ services:
       dockerfile: Dockerfile.worker
     container_name: demerivo-ai-worker
     restart: always
+    stop_grace_period: 30s
     environment:
       - DEMERIVO_ENV=production
       - DEMERIVO_DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-demerivo_user}:${POSTGRES_PASSWORD:-CHANGE_ME_POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-demerivo_db}
       - DEMERIVO_REDIS_URL=redis://:${REDIS_PASSWORD:-CHANGE_ME_REDIS_PASSWORD}@redis:6379/0
       - DEMERIVO_QUEUE_BACKEND=redis
       - DEMERIVO_STORAGE_PROVIDER=${DEMERIVO_STORAGE_PROVIDER:-s3}
+      - DEMERIVO_SUPABASE_JWT_SECRET=${DEMERIVO_SUPABASE_JWT_SECRET}
       - DEMERIVO_S3_ENDPOINT_URL=${DEMERIVO_S3_ENDPOINT_URL}
       - DEMERIVO_S3_BUCKET_NAME=${DEMERIVO_S3_BUCKET_NAME}
       - DEMERIVO_S3_ACCESS_KEY_ID=${DEMERIVO_S3_ACCESS_KEY_ID}
@@ -144,7 +146,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'demerivo.workers.runner' > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import os, time, sys; p = '/tmp/worker-heartbeat'; sys.exit(0 if os.path.exists(p) and (time.time() - os.path.getmtime(p)) < 60 else 1)\""]
       interval: 30s
       timeout: 5s
       retries: 3

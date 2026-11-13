@@ -2,9 +2,11 @@
 
 import logging
 import os
+from pathlib import Path
 import signal
 import socket
 import sys
+import tempfile
 import time
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -16,6 +18,33 @@ from demerivo.logging_config import setup_logging
 from demerivo.workers.manager import WorkerManager
 
 logger = logging.getLogger("demerivo.worker.runner")
+
+HEARTBEAT_FILE = os.environ.get(
+    "DEMERIVO_WORKER_HEARTBEAT_FILE",
+    os.path.join(tempfile.gettempdir(), "worker-heartbeat") if os.name == "nt" else "/tmp/worker-heartbeat"
+)
+
+
+def write_heartbeat_file(heartbeat_path: Optional[str] = None) -> None:
+    """Touch local heartbeat file to signal health to container orchestrator."""
+    path_str = heartbeat_path or HEARTBEAT_FILE
+    try:
+        p = Path(path_str)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(str(time.time()), encoding="utf-8")
+    except Exception as e:
+        logger.warning("Failed to write local heartbeat file %s: %s", path_str, e)
+
+
+def remove_heartbeat_file(heartbeat_path: Optional[str] = None) -> None:
+    """Remove local heartbeat file when worker is unhealthy or stopped."""
+    path_str = heartbeat_path or HEARTBEAT_FILE
+    try:
+        p = Path(path_str)
+        if p.exists():
+            p.unlink()
+    except Exception as e:
+        logger.warning("Failed to remove local heartbeat file %s: %s", path_str, e)
 
 
 def update_heartbeat(worker_id: str, hostname: str, status_str: str, active_jobs: int):
@@ -64,7 +93,9 @@ def main():
 
     # Start worker pool
     manager.start()
-    update_heartbeat(worker_id, hostname, "active", 0)
+    if manager.is_healthy():
+        update_heartbeat(worker_id, hostname, "active", manager.active_worker_count())
+        write_heartbeat_file()
 
     # Signal handlers for graceful container termination (SIGTERM / SIGINT)
     shutdown_requested = False
@@ -83,18 +114,54 @@ def main():
     # Main supervisor loop: heartbeats every 15 seconds
     try:
         while not shutdown_requested:
-            active_count = sum(1 for w in manager.workers if w._running)
-            update_heartbeat(worker_id, hostname, "active", active_count)
-            time.sleep(15)
+            if manager.is_healthy():
+                alive_count = manager.active_worker_count()
+                total_workers = len(manager.workers)
+                # Differentiate fully active vs partially degraded worker pool
+                status_str = "active" if (total_workers > 0 and alive_count == total_workers) else "degraded"
+                update_heartbeat(worker_id, hostname, status_str, alive_count)
+                write_heartbeat_file()
+            else:
+                logger.error("Worker healthcheck failed: all worker threads are inactive or crashed!")
+                update_heartbeat(worker_id, hostname, "crashed", 0)
+                remove_heartbeat_file()
+
+            # Responsive sleep loop checking shutdown_requested every second
+            for _ in range(15):
+                if shutdown_requested:
+                    break
+                time.sleep(1)
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received.")
+    finally:
+        # Resilient graceful shutdown: telemetry failures must NEVER prevent process cleanup
+        logger.info("Initiating resilient worker shutdown sequence...")
 
-    # Graceful shutdown
-    logger.info("Stopping worker manager pool...")
-    update_heartbeat(worker_id, hostname, "stopping", 0)
-    manager.stop(timeout=10.0)
-    update_heartbeat(worker_id, hostname, "stopped", 0)
-    logger.info("Worker process [%s] terminated cleanly.", worker_id)
+        # 1. Unlink local heartbeat file so container orchestrator knows shutdown has started
+        try:
+            remove_heartbeat_file()
+        except Exception as e:
+            logger.warning("Error removing heartbeat file during shutdown: %s", e)
+
+        # 2. Record 'stopping' telemetry (non-blocking, failure tolerant)
+        try:
+            update_heartbeat(worker_id, hostname, "stopping", 0)
+        except Exception as e:
+            logger.warning("Telemetry update ('stopping') failed during shutdown: %s", e)
+
+        # 3. Shutdown worker manager and all worker/recovery threads (MANDATORY)
+        try:
+            manager.stop(timeout=20.0)
+        except Exception as e:
+            logger.error("Error stopping WorkerManager: %s", e)
+
+        # 4. Record 'stopped' telemetry (non-blocking, failure tolerant)
+        try:
+            update_heartbeat(worker_id, hostname, "stopped", 0)
+        except Exception as e:
+            logger.warning("Telemetry update ('stopped') failed during shutdown: %s", e)
+
+        logger.info("Worker process [%s] terminated.", worker_id)
     sys.exit(0)
 
 

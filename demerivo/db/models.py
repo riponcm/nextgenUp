@@ -349,6 +349,17 @@ class CreditTransactionModel(Base):
 
     __table_args__ = (
         Index("idx_credit_tx_tenant_created", "tenant_id", "created_at"),
+        Index(
+            "uq_credit_tx_job_refund",
+            "job_id",
+            unique=True,
+            postgresql_where=(
+                (Column("transaction_type").in_(["refund", "REFUND"])) & (Column("job_id").isnot(None))
+            ),
+            sqlite_where=(
+                (Column("transaction_type").in_(["refund", "REFUND"])) & (Column("job_id").isnot(None))
+            ),
+        ),
     )
 
     def to_dict(self) -> Dict[str, Any]:

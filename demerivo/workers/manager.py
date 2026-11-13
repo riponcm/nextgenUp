@@ -37,6 +37,7 @@ class WorkerManager:
         self.workers: List[DurableWorker] = []
         self._running = False
         self._recovery_thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
 
     def start(self):
         """Start worker pool and background recovery monitor."""
@@ -64,15 +65,69 @@ class WorkerManager:
         self._recovery_thread.start()
         logger.info("WorkerManager started %d workers and recovery monitor.", len(self.workers))
 
-    def stop(self, timeout: float = 5.0):
-        """Gracefully shut down all workers."""
+    def is_healthy(self, now: Optional[float] = None) -> bool:
+        """Verify supervisor health and worker thread availability.
+
+        Health Policy:
+        - Healthy (True): Manager is running and at least one worker is active, alive,
+          and verifiably making progress (not stuck or deadlocked).
+          If 1 of N workers dies or gets stuck, the manager remains functional in degraded capacity,
+          allowing surviving workers to continue processing in-flight and queued jobs
+          without triggering orchestrator container churn.
+        - Unhealthy (False): Manager is stopped, or ALL worker threads are dead or stuck.
+          Orchestrators (Docker/K8s) must mark the container unhealthy and restart it.
+        """
+        if not self._running or not self.workers:
+            return False
+        return any(w.is_healthy(now=now) for w in self.workers)
+
+    def active_worker_count(self, now: Optional[float] = None) -> int:
+        """Return count of actively running, non-stuck worker threads."""
+        return sum(1 for w in self.workers if w.is_healthy(now=now))
+
+    def stop(self, timeout: float = 15.0):
+        """Gracefully shut down all workers within the shared timeout budget.
+
+        Ensures:
+        1. All workers immediately stop accepting new queue jobs.
+        2. In-flight jobs are allowed to complete within the shared timeout.
+        3. Total wait time across all workers is strictly bounded by `timeout`.
+        4. Workers exceeding the timeout are NOT silently hidden; surviving threads
+           remain tracked in `self.workers` so manager state accurately reflects runtime reality.
+        5. Background crash recovery monitor is cleanly stopped.
+        """
         if not self._running:
             return
         self._running = False
+        self._stop_event.set()
+
+        # 1. Immediately signal all workers to cease accepting new jobs
         for worker in self.workers:
-            worker.stop(timeout=timeout)
-        self.workers.clear()
-        logger.info("WorkerManager stopped all workers.")
+            worker._running = False
+
+        # 2. Wait for all workers within a shared overall timeout budget
+        deadline = time.time() + timeout
+        surviving = []
+        for worker in self.workers:
+            remaining = max(0.0, deadline - time.time())
+            worker.stop(timeout=remaining)
+            if worker._thread and worker._thread.is_alive():
+                surviving.append(worker)
+
+        # 3. Join background recovery thread if active
+        if self._recovery_thread and self._recovery_thread.is_alive():
+            self._recovery_thread.join(timeout=1.0)
+
+        if surviving:
+            logger.warning(
+                "WorkerManager shutdown timed out with %d surviving worker(s): %s",
+                len(surviving),
+                [w.worker_id for w in surviving],
+            )
+            self.workers = surviving
+        else:
+            self.workers.clear()
+            logger.info("WorkerManager stopped all workers cleanly.")
 
     def enqueue_job(self, job_id: str) -> str:
         """Enqueue a job into the persistent queue."""
@@ -84,7 +139,7 @@ class WorkerManager:
 
     def recover_stranded_jobs(self, timeout_seconds: Optional[int] = None) -> List[str]:
         """Detect jobs whose worker crashed during processing and refund reserved credits."""
-        timeout = timeout_seconds or self.settings.job_timeout_seconds
+        timeout = self.settings.job_timeout_seconds if timeout_seconds is None else timeout_seconds
         recovered_job_ids = self.queue.recover_stranded_jobs(timeout_seconds=timeout)
 
         for job_id in recovered_job_ids:
@@ -106,12 +161,12 @@ class WorkerManager:
 
     def _recovery_monitor_loop(self):
         """Periodic background thread checking for orphaned tasks."""
-        while self._running:
+        while self._running and not self._stop_event.is_set():
             try:
                 self.recover_stranded_jobs()
             except Exception as e:
                 logger.error("Error in recovery monitor loop: %s", e)
-            time.sleep(30)
+            self._stop_event.wait(timeout=30)
 
 
 _worker_manager_instance: Optional[WorkerManager] = None

@@ -53,6 +53,19 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: demerivo_user
+          POSTGRES_PASSWORD: demerivo_secret
+          POSTGRES_DB: demerivo_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U demerivo_user -d demerivo_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout Code
@@ -91,6 +104,8 @@ jobs:
           DEMERIVO_ADMIN_SECRET: testing-admin-secret-token-32chars
           DEMERIVO_RATE_LIMIT_STORAGE: memory
           REDIS_URL: redis://localhost:6379/0
+          POSTGRES_TEST_URL: postgresql://demerivo_user:demerivo_secret@localhost:5432/demerivo_db
+          CI: "true"
           PYTHONPATH: .
         run: |
           pytest -v --tb=short

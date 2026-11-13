@@ -145,8 +145,9 @@ class JobService:
     ) -> JobModel:
         """Update job lifecycle status enforcing state machine and handling credit finalization/refunds."""
         job = JobService.get_job(db, job_id, tenant_id=tenant_id)
+        status_changed = (target_status != job.status)
 
-        if target_status != job.status:
+        if status_changed:
             allowed = VALID_TRANSITIONS.get(job.status, set())
             if target_status not in allowed:
                 raise InvalidJobStateTransition(
@@ -166,19 +167,24 @@ class JobService:
         if target_status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED):
             job.completed_at = utcnow()
 
-        # Handle credit accounting side-effects
-        wallet_service = get_wallet_service()
-        if target_status == JobStatus.COMPLETED:
-            wallet_service.finalize_consumption(job.id, db)
-        elif target_status in (JobStatus.FAILED, JobStatus.CANCELLED) and job.credit_cost > 0:
-            wallet_service.refund_credits(
-                tenant_id=job.tenant_id,
-                amount=job.credit_cost,
-                job_id=job.id,
-                user_id=job.user_id,
-                reason=f"Refund for {target_status.value} job: {error_message or 'cancelled'}",
-                db=db,
-            )
+        # Handle credit accounting side-effects only when status actually changes
+        if status_changed:
+            wallet_service = get_wallet_service()
+            if target_status == JobStatus.COMPLETED:
+                wallet_service.finalize_consumption(job.id, db)
+            elif target_status in (JobStatus.FAILED, JobStatus.CANCELLED):
+                # Prefer ledger as authoritative source for total reserved credits (accounting for add-ons)
+                total_reserved = wallet_service.get_job_reservation_total(job.tenant_id, job.id, db)
+                refund_amount = total_reserved if total_reserved > 0 else job.credit_cost
+                if refund_amount > 0:
+                    wallet_service.refund_credits(
+                        tenant_id=job.tenant_id,
+                        amount=refund_amount,
+                        job_id=job.id,
+                        user_id=job.user_id,
+                        reason=f"Refund for {target_status.value} job: {error_message or 'cancelled'}",
+                        db=db,
+                    )
 
         db.commit()
         db.refresh(job)

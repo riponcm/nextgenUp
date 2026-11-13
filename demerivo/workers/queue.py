@@ -2,6 +2,7 @@
 
 import json
 import logging
+import math
 import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
@@ -41,6 +42,11 @@ class QueueProvider(ABC):
         pass
 
     @abstractmethod
+    def renew_lease(self, job_id: str) -> bool:
+        """Extend lease timestamp for an in-flight job during active progress."""
+        pass
+
+    @abstractmethod
     def recover_stranded_jobs(self, timeout_seconds: int = 600) -> List[str]:
         """Detect jobs whose worker lease expired without acknowledgment and re-enqueue them."""
         pass
@@ -61,7 +67,7 @@ class LocalDurableQueueProvider(QueueProvider):
                 self._pending.append(job_id)
         return job_id
 
-    def dequeue(self, timeout: int = 2) -> Optional[str]:
+    def dequeue(self, timeout: float = 2.0) -> Optional[str]:
         start = time.time()
         while time.time() - start < timeout:
             with self._lock:
@@ -69,7 +75,7 @@ class LocalDurableQueueProvider(QueueProvider):
                     job_id = self._pending.pop(0)
                     self._processing[job_id] = time.time()
                     return job_id
-            time.sleep(0.05)
+            time.sleep(0.02)
         return None
 
     def acknowledge(self, job_id: str) -> bool:
@@ -87,12 +93,19 @@ class LocalDurableQueueProvider(QueueProvider):
         with self._lock:
             return len(self._pending)
 
+    def renew_lease(self, job_id: str) -> bool:
+        with self._lock:
+            if job_id in self._processing:
+                self._processing[job_id] = time.time()
+                return True
+        return False
+
     def recover_stranded_jobs(self, timeout_seconds: int = 600) -> List[str]:
         now = time.time()
         stranded = []
         with self._lock:
             for job_id, lease_time in list(self._processing.items()):
-                if now - lease_time > timeout_seconds:
+                if now - lease_time >= timeout_seconds:
                     stranded.append(job_id)
                     del self._processing[job_id]
                     self._pending.append(job_id)
@@ -119,10 +132,12 @@ class RedisQueueProvider(QueueProvider):
         self.redis.lpush(self.pending_key, job_id)
         return job_id
 
-    def dequeue(self, timeout: int = 2) -> Optional[str]:
+    def dequeue(self, timeout: float = 2.0) -> Optional[str]:
         # Atomic transfer from pending to processing list
         try:
-            job_id = self.redis.brpoplpush(self.pending_key, self.processing_key, timeout=timeout)
+            # Redis BRPOPLPUSH requires an integer timeout >= 0
+            redis_timeout = max(1, int(math.ceil(timeout))) if timeout > 0 else 0
+            job_id = self.redis.brpoplpush(self.pending_key, self.processing_key, timeout=redis_timeout)
             if job_id:
                 # Record lease timestamp
                 self.redis.hset(self.leases_key, job_id, str(time.time()))
@@ -130,6 +145,15 @@ class RedisQueueProvider(QueueProvider):
         except Exception as e:
             logger.error("Redis dequeue error: %s", e)
             return None
+
+    def renew_lease(self, job_id: str) -> bool:
+        """Extend lease timestamp in Redis hash during active job processing."""
+        try:
+            self.redis.hset(self.leases_key, job_id, str(time.time()))
+            return True
+        except Exception as e:
+            logger.error("Redis renew_lease error for job %s: %s", job_id, e)
+            return False
 
     def acknowledge(self, job_id: str) -> bool:
         pipe = self.redis.pipeline()
@@ -156,7 +180,7 @@ class RedisQueueProvider(QueueProvider):
         for job_id, lease_str in leases.items():
             try:
                 lease_time = float(lease_str)
-                if now - lease_time > timeout_seconds:
+                if now - lease_time >= timeout_seconds:
                     stranded.append(job_id)
                     pipe = self.redis.pipeline()
                     pipe.lrem(self.processing_key, 0, job_id)

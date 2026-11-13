@@ -11,7 +11,7 @@ from demerivo.config import Settings, get_settings
 from demerivo.credits.wallet_service import get_wallet_service
 from demerivo.db.models import JobStatus
 from demerivo.db.session import SessionLocal
-from demerivo.jobs.service import JobService
+from demerivo.jobs.service import InvalidJobStateTransition, JobService
 from demerivo.storage.base import StorageProvider
 from demerivo.storage.factory import get_storage
 from demerivo.workers.queue import QueueProvider, get_queue_provider
@@ -39,10 +39,19 @@ class DurableWorker:
         self.wallet_service = get_wallet_service()
         self._running = False
         self._thread: Optional[threading.Thread] = None
+        self.state: str = "stopped"  # stopped, idle, processing
+        self.last_activity_time: float = time.time()
+        self.last_progress_time: float = time.time()
+        self.current_job_id: Optional[str] = None
+        self.current_stage: Optional[str] = None
+        self.current_progress_percent: int = 0
 
     def start(self):
         """Start the worker thread."""
         self._running = True
+        self.state = "idle"
+        self.last_activity_time = time.time()
+        self.last_progress_time = time.time()
         self._thread = threading.Thread(target=self._run_loop, name=f"DemerivoWorker-{self.worker_id}", daemon=True)
         self._thread.start()
         logger.info("[%s] Worker started.", self.worker_id)
@@ -52,25 +61,84 @@ class DurableWorker:
         self._running = False
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=timeout)
+        self.state = "stopped"
         logger.info("[%s] Worker stopped.", self.worker_id)
 
     def _run_loop(self):
         """Main polling loop."""
+        self.state = "idle"
+        self.last_activity_time = time.time()
+        self.last_progress_time = time.time()
+
         while self._running:
             try:
-                job_id = self.queue.dequeue(timeout=2)
+                self.state = "idle"
+                self.last_activity_time = time.time()
+                job_id = self.queue.dequeue(timeout=0.2)
                 if not job_id:
                     continue
 
+                self.state = "processing"
+                self.current_job_id = job_id
+                self.last_activity_time = time.time()
+                self.last_progress_time = time.time()
                 logger.info("[%s] Picked up job %s", self.worker_id, job_id)
                 self.process_job(job_id)
             except Exception as e:
                 logger.error("[%s] Unexpected loop error: %s", self.worker_id, e)
                 time.sleep(1)
+            finally:
+                self.current_job_id = None
+                self.current_stage = None
+                self.current_progress_percent = 0
+                self.state = "idle"
+                self.last_activity_time = time.time()
+                self.last_progress_time = time.time()
+
+    def is_stuck(
+        self,
+        idle_timeout: float = 60.0,
+        processing_timeout: float = 300.0,
+        now: Optional[float] = None,
+    ) -> bool:
+        """Determine if worker thread is deadlocked or has ceased making forward progress."""
+        if not self._running:
+            return False
+        if not self._thread or not self._thread.is_alive():
+            return False
+
+        curr = now if now is not None else time.time()
+
+        if self.state == "idle":
+            return (curr - self.last_activity_time) > idle_timeout
+        elif self.state == "processing":
+            return (curr - self.last_progress_time) > processing_timeout
+
+        return False
+
+    def is_healthy(
+        self,
+        idle_timeout: float = 60.0,
+        processing_timeout: float = 300.0,
+        now: Optional[float] = None,
+    ) -> bool:
+        """Worker is healthy if running, alive, and making verifiable forward progress."""
+        if not self._running:
+            return False
+        if self._thread is None or not self._thread.is_alive():
+            return False
+        if self.is_stuck(idle_timeout=idle_timeout, processing_timeout=processing_timeout, now=now):
+            return False
+        return True
 
     def process_job(self, job_id: str) -> bool:
         """Process a single job through the complete pipeline with credit safety."""
         # 1. Fetch job metadata in short-lived database session
+        self.current_stage = "initializing"
+        self.current_progress_percent = 5
+        self.last_progress_time = time.time()
+        self.queue.renew_lease(job_id)
+
         with self.session_factory() as db:
             try:
                 job = JobService.get_job(db, job_id)
@@ -84,6 +152,11 @@ class DurableWorker:
                 self.queue.acknowledge(job_id)
                 return True
 
+            if job.status in (JobStatus.FAILED, JobStatus.COMPLETED):
+                logger.info("Job %s already in terminal state %s before processing started.", job_id, job.status.value)
+                self.queue.acknowledge(job_id)
+                return False
+
             tenant_id = job.tenant_id
             user_id = job.user_id
             operation_type = job.operation_type
@@ -96,6 +169,10 @@ class DurableWorker:
 
         # 2. Progress callback updating database without holding long transactions
         def _on_progress(stage: str, percent: int):
+            self.current_stage = stage
+            self.current_progress_percent = percent
+            self.last_progress_time = time.time()
+            self.queue.renew_lease(job_id)
             try:
                 with self.session_factory() as db:
                     JobService.update_status(db, job_id, JobStatus.PROCESSING, progress=percent)
@@ -103,6 +180,10 @@ class DurableWorker:
                 pass
 
         # 3. Retrieve input image from storage
+        self.current_stage = "downloading"
+        self.current_progress_percent = 15
+        self.last_progress_time = time.time()
+        self.queue.renew_lease(job_id)
         try:
             input_bytes = self.storage.download_file(input_key)
         except Exception as e:
@@ -111,6 +192,10 @@ class DurableWorker:
             return False
 
         # 4. Execute AI pipeline
+        self.current_stage = "inference"
+        self.current_progress_percent = 30
+        self.last_progress_time = time.time()
+        self.queue.renew_lease(job_id)
         try:
             output_bytes, dims = self.ai_engine.process(
                 image_bytes=input_bytes,
@@ -124,6 +209,10 @@ class DurableWorker:
             return False
 
         # 5. Upload output image to storage
+        self.current_stage = "uploading"
+        self.current_progress_percent = 90
+        self.last_progress_time = time.time()
+        self.queue.renew_lease(job_id)
         output_key = f"outputs/{tenant_id}/{job_id}.png"
         try:
             self.storage.upload_file(
@@ -138,15 +227,28 @@ class DurableWorker:
 
         # 6. Finalize job success and credit consumption
         with self.session_factory() as db:
-            JobService.update_status(
-                db=db,
-                job_id=job_id,
-                target_status=JobStatus.COMPLETED,
-                progress=100,
-                output_key=output_key,
-            )
-            self.wallet_service.finalize_consumption(job_id, db)
+            try:
+                JobService.update_status(
+                    db=db,
+                    job_id=job_id,
+                    target_status=JobStatus.COMPLETED,
+                    progress=100,
+                    output_key=output_key,
+                )
+                self.wallet_service.finalize_consumption(job_id, db)
+            except InvalidJobStateTransition as e:
+                logger.warning(
+                    "[%s] Job %s cannot be transitioned to COMPLETED (%s). Discarding late completion.",
+                    self.worker_id,
+                    job_id,
+                    e,
+                )
+                self.queue.acknowledge(job_id)
+                return False
 
+        self.current_stage = "completed"
+        self.current_progress_percent = 100
+        self.last_progress_time = time.time()
         self.queue.acknowledge(job_id)
         logger.info("[%s] Successfully completed job %s (size: %s)", self.worker_id, job_id, dims)
         return True
