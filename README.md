@@ -3,6 +3,14 @@
 </p>
 
 <p align="center">
+  <a href="https://play.google.com/store/apps/details?id=org.matily.nextgenup"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get NextGenUp on Google Play" width="320"></a>
+  <br>
+  <img src="assets/buttons/ios-coming-soon.svg" alt="NextGenUp for iPhone and iPad: coming soon" width="200" height="53">
+</p>
+
+<p align="center"><b>New: NextGenUp for Android.</b> Make videos 4K, split vocals, clean audio and bring color back to old photos, all on your phone. Free, nothing is uploaded.</p>
+
+<p align="center">
   <a href="https://github.com/riponcm/nextgenUp/releases/latest"><img src="https://img.shields.io/github/v/release/riponcm/nextgenUp?style=for-the-badge&color=6c5ce7&label=Release" alt="Latest release"></a>
   <a href="https://github.com/riponcm/nextgenUp/releases"><img src="https://img.shields.io/github/downloads/riponcm/nextgenUp/total?style=for-the-badge&color=00cec9&label=Downloads" alt="Total downloads"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-00b894?style=for-the-badge" alt="MIT license"></a>
@@ -58,6 +66,11 @@ Excellent tools all around — NextGenUp's niche is covering **images, audio, vi
 | **Mac** with Apple Silicon (M1, M2, M3, M4) | [NextGenUp-Mac-AppleSilicon.dmg](https://github.com/riponcm/nextgenUp/releases/latest/download/NextGenUp-Mac-AppleSilicon.dmg) | Macs from 2020 onward. Not sure? Apple menu > About This Mac > "Chip" |
 | **Mac** with Intel | [NextGenUp-Mac-Intel.dmg](https://github.com/riponcm/nextgenUp/releases/latest/download/NextGenUp-Mac-Intel.dmg) | Macs from 2019 and earlier |
 | **Linux** | [NextGenUp-Linux.AppImage](https://github.com/riponcm/nextgenUp/releases/latest/download/NextGenUp-Linux.AppImage) | Any distribution. `chmod +x` then run. An RPM is also on the release page |
+
+| Your phone | Get it | Notes |
+|---|---|---|
+| **Android** | [NextGenUp on Google Play](https://play.google.com/store/apps/details?id=org.matily.nextgenup) | Make it 4K, Vocal splitter, Clean audio, Photo upscale and Old photo, all on the phone. Updates come through Google Play |
+| **iPhone / iPad** | Coming soon | |
 
 Every installer is fully self-contained — the AI engine, FFmpeg, and the upscaling models are bundled. Install, open, upscale. The app checks for updates on launch and installs them with one click (signed releases).
 
@@ -350,7 +363,7 @@ Click the folder button in the top bar. The Storage section shows the leftover w
 Look in your save folder first (top bar, folder button, Open folder). If automatic saving was off, the result stays in the app's data folder for 24 hours: `%APPDATA%\com.riponcm.nextgenup\outputs` on Windows, `~/Library/Application Support/com.riponcm.nextgenup/outputs` on macOS, and `~/.local/share/com.riponcm.nextgenup/outputs` on Linux. Closing the app during a job stops it, so NextGenUp now asks before closing while a job runs.
 
 **What platforms does NextGenUp support?**
-Desktop apps for macOS (Apple Silicon and Intel), Windows 10/11 x64, and Linux (AppImage/deb). It also runs as a self-hosted web app usable from any browser on your network, including phones and tablets.
+Desktop apps for macOS (Apple Silicon and Intel), Windows 10/11 x64, and Linux (AppImage/deb), and an [Android app on Google Play](https://play.google.com/store/apps/details?id=org.matily.nextgenup) (iPhone and iPad coming soon). The desktop app also runs as a self-hosted web app usable from any browser on your network, including phones and tablets.
 
 **Do I need a GPU?**
 No. Browser modes use WebGPU when available and fall back to WASM; the server modes run on CPU. A GPU makes things faster but nothing requires one.
