@@ -1,0 +1,49 @@
+# =============================================================================
+# Demerivo PixelFix — Production CPU AI Background Worker Container
+# =============================================================================
+
+FROM python:3.11-slim AS runtime
+
+LABEL maintainer="Demerivo Engineering <engineering@demerivo.com>"
+LABEL product="Demerivo PixelFix"
+LABEL component="ai-worker"
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    OMP_NUM_THREADS=2 \
+    MKL_NUM_THREADS=2
+
+# Install minimal OS dependencies for math runtimes and process monitoring
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    ca-certificates \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Security: Create non-root execution user and group
+RUN groupadd -g 10001 demerivo && \
+    useradd -u 10001 -g demerivo -m -s /bin/bash demerivo
+
+WORKDIR /app
+RUN chown demerivo:demerivo /app
+
+# Install Python production dependencies
+COPY requirements-prod.txt .
+RUN pip install --no-cache-dir -r requirements-prod.txt
+
+# Copy application source code with non-root ownership
+COPY --chown=demerivo:demerivo demerivo/ ./demerivo/
+
+# Switch to non-root execution context
+USER demerivo
+
+# Worker healthcheck verifying actual worker thread activity and heartbeat freshness
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD python -c "import os, time, sys; p = '/tmp/worker-heartbeat'; sys.exit(0 if os.path.exists(p) and (time.time() - os.path.getmtime(p)) < 60 else 1)"
+
+STOPSIGNAL SIGTERM
+
+# Execute standalone background worker supervisor
+CMD ["python", "-m", "demerivo.workers.runner"]
